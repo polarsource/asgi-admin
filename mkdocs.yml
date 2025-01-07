@@ -1,0 +1,64 @@
+site_name: ASGI Admin
+site_description: Opinonated ASGI Admin builder
+
+repo_url: https://github.com/frankie567/asgi-admin
+repo_name: frankie567/asgi-admin
+
+theme:
+    name: material
+    icon:
+        logo: material/view-dashboard
+    palette:
+        # Palette toggle for automatic mode
+        - media: "(prefers-color-scheme)"
+          toggle:
+            icon: material/brightness-auto
+            name: Switch to light mode
+
+        # Palette toggle for light mode
+        - media: "(prefers-color-scheme: light)"
+          scheme: default
+          primary: amber
+          accent: amber
+          toggle:
+            icon: material/brightness-7
+            name: Switch to dark mode
+
+        # Palette toggle for dark mode
+        - media: "(prefers-color-scheme: dark)"
+          scheme: slate
+          primary: amber
+          accent: amber
+          toggle:
+            icon: material/brightness-4
+            name: Switch to light mode
+
+markdown_extensions:
+    - toc:
+        permalink: true
+    - pymdownx.highlight:
+        anchor_linenums: true
+    - pymdownx.tasklist:
+        custom_checkbox: true
+    - pymdownx.inlinehilite
+    - pymdownx.snippets
+    - pymdownx.superfences
+
+plugins:
+    - search
+    - mkdocstrings:
+        handlers:
+            python:
+                import:
+                    - https://docs.python.org/3.9/objects.inv
+                options:
+                    docstring_style: google
+
+watch:
+    - docs
+    - asgi_admin
+
+nav:
+    - About: index.md
+    - Reference:
+        - asgi_admin: reference/asgi_admin.md
