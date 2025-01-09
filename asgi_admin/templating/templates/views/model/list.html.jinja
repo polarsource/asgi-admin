@@ -5,7 +5,22 @@
     <thead>
       <tr>
         {% for field in view.list_fields %}
-          <th>{{ view.field_labels[field] or field }}</th>
+          <th>
+            {% if field in view.list_sortable_fields %}
+              <a class="" href="{{ sorting.get_sorting_route(field) }}">
+                {{ view.field_labels[field] or field }}
+                {% if sorting.fields[field] %}
+                  {% if sorting.fields[field] == "ASC" %}
+                    ⬇️
+                  {% else %}
+                    ⬆️
+                  {% endif %}
+                {% endif %}
+              </a>
+            {% else %}
+              {{ view.field_labels[field] or field }}
+            {% endif %}
+          </th>
         {% endfor %}
       </tr>
     </thead>

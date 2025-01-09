@@ -1,6 +1,6 @@
 import urllib
 import urllib.parse
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from typing import Any, ClassVar, Generic, TypedDict, TypeVar, Union
 
 from starlette.requests import Request
@@ -10,7 +10,7 @@ from starlette.routing import Route, Router
 from ._normalization import class_name_to_url_path
 from ._routing import get_current_route
 from .exceptions import ASGIAdminConfigurationError
-from .repository import Model, RepositoryProtocol
+from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
 from .templating import templates
 
 ViewType = TypeVar("ViewType", bound="ViewBase")
@@ -159,11 +159,17 @@ class PaginationOutput(TypedDict):
     previous_route: Union[str, None]
 
 
+class SortingOutput(TypedDict):
+    fields: dict[str, Union[SortingOrder, None]]
+    get_sorting_route: Callable[[str], str]
+
+
 class ModelView(ViewBase, Generic[Model]):
     model: ClassVar[type[Any]]
-    list_default_limit: ClassVar[int] = 10
-    list_fields: ClassVar[Iterable[str]]
     field_labels: ClassVar[dict[str, str]] = {}
+    list_default_limit: ClassVar[int] = 10
+    list_fields: ClassVar[Sequence[str]]
+    list_sortable_fields: ClassVar[Iterable[str]]
 
     def __init_subclass__(cls, **kwargs):
         if not hasattr(cls, "model"):
@@ -174,6 +180,8 @@ class ModelView(ViewBase, Generic[Model]):
             cls.title = cls.model.__name__
         if not hasattr(cls, "prefix"):
             cls.prefix = f"/{class_name_to_url_path(cls.model.__name__)}"
+        if not hasattr(cls, "list_sortable_fields"):
+            cls.list_sortable_fields = cls.list_fields
         super().__init_subclass__(**kwargs)
 
     async def get_repository(self, request: Request) -> RepositoryProtocol[Model]:
@@ -182,8 +190,10 @@ class ModelView(ViewBase, Generic[Model]):
     @route("/", methods=["GET"], index=True)
     async def list(self, request: Request) -> Response:
         offset, limit = self._get_pagination_input(request)
+        sorting = self._get_sorting_input(request)
+
         repository = await self.get_repository(request)
-        total, items = await repository.paginate(offset, limit)
+        total, items = await repository.paginate(sorting, offset, limit)
         return templates.TemplateResponse(
             request,
             "views/model/list.html.jinja",
@@ -194,6 +204,7 @@ class ModelView(ViewBase, Generic[Model]):
                 "pagination": self._get_pagination_output(
                     request, offset, limit, total
                 ),
+                "sorting": self._get_sorting_output(request, sorting),
             },
         )
 
@@ -236,3 +247,55 @@ class ModelView(ViewBase, Generic[Model]):
             "next_route": next_route,
             "previous_route": previous_route,
         }
+
+    def _get_sorting_input(self, request: Request) -> Sorting:
+        sorting_param = request.query_params.get("sorting")
+        if sorting_param is None:
+            return []
+
+        sorting = []
+        for field in sorting_param.split(","):
+            order = SortingOrder.ASC
+            if field.startswith("-"):
+                order = SortingOrder.DESC
+                field = field[1:]
+            if field in self.list_sortable_fields:
+                sorting.append((field, order))
+        return sorting
+
+    def _get_sorting_output(self, request: Request, sorting: Sorting) -> SortingOutput:
+        current_route = get_current_route(request)
+        assert current_route is not None
+
+        fields: dict[str, Union[SortingOrder, None]] = {
+            field: None for field in self.list_sortable_fields
+        }
+        for field, current_order in sorting:
+            fields[field] = current_order
+
+        def get_sorting_route(field: str) -> str:
+            sorting_param = []
+            field_found = False
+            for current_field, current_order in sorting:
+                if current_field != field:
+                    sorting_param.append(
+                        f"{current_field}"
+                        if current_order == SortingOrder.ASC
+                        else f"-{current_field}"
+                    )
+                else:
+                    field_found = True
+                    if current_order == SortingOrder.DESC:
+                        continue
+                    else:
+                        sorting_param.append(f"-{field}")
+
+            if not field_found:
+                sorting_param.append(field)
+
+            query_params = urllib.parse.urlencode(
+                {**request.query_params, "sorting": ",".join(sorting_param)}
+            )
+            return f"{request.url_for(current_route)}?{query_params}"
+
+        return {"fields": fields, "get_sorting_route": get_sorting_route}
