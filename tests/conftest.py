@@ -40,6 +40,7 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
 
 class MyModelView(ModelView[MyModel]):
     model = MyModel
+    list_fields = ("id", "label", "created_at")
 
     async def get_repository(self, request: Request) -> MyModelRepository:
         return MyModelRepository()

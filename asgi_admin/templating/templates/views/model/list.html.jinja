@@ -1,0 +1,22 @@
+{% extends "views/model/layout.html.jinja" %}
+
+{% block content %}
+<table class="table is-fullwidth is-hoverable is-bordered">
+  <thead>
+    <tr>
+      {% for field in fields %}
+      <th>{{ field }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      {% for field in fields %}
+      <td>{{ item[field] }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -18,7 +18,7 @@ class MyAdmin(AdminBase):
 @pytest.fixture
 def app() -> Starlette:
     app = Starlette()
-    app.mount("/admin", MyAdmin().router)
+    app.mount("/admin", MyAdmin())
     return app
 
 
@@ -32,7 +32,7 @@ async def client(app: Starlette) -> AsyncIterator[httpx.AsyncClient]:
 
 @pytest.mark.asyncio
 async def test_app(client: httpx.AsyncClient) -> None:
-    response = await client.get("/admin/")
+    response = await client.get("/admin/my-model/")
     assert response.status_code == 200
 
     parsed = BeautifulSoup(response.text, "html.parser")

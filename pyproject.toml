@@ -39,6 +39,7 @@ dependencies = [
 
 [tool.hatch.envs.default.scripts]
 test = "pytest"
+test-app = "uvicorn tests.app:app --reload"
 test-cov-xml = "pytest --cov-report=xml"
 lint = [
   "ruff format .",
@@ -72,6 +73,7 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "starlette",
+    "jinja2",
 ]
 
 [project.optional-dependencies]
