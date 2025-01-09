@@ -7,10 +7,10 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from asgi_admin.views import ViewBase
 
 
-class NavigationMiddleware:
-    def __init__(self, app: ASGIApp, views: list[ViewBase]) -> None:
+class AdminStateMiddleware:
+    def __init__(self, app: ASGIApp, admin: "AdminBase") -> None:
         self.app = app
-        self.views = views
+        self.admin = admin
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket"):
@@ -19,17 +19,27 @@ class NavigationMiddleware:
                     "title": view.title,
                     "index_route": view.index_route.name,
                 }
-                for view in self.views
+                for view in self.admin.views
             ]
+            scope["state"]["_asgi_admin_title"] = self.admin.title
         await self.app(scope, receive, send)
 
 
 class AdminBase(Router):
-    views: ClassVar[list[ViewBase]]
+    views: ClassVar[list[ViewBase]] = []
+    title: ClassVar[str]
+
+    def __init_subclass__(cls) -> None:
+        if not hasattr(cls, "title"):
+            cls.title = cls.__name__
+        return super().__init_subclass__()
 
     def __init__(self) -> None:
         routes = [Mount(view.prefix, view.router) for view in self.views]
         middleware = [
-            Middleware(NavigationMiddleware, views=self.views),
+            Middleware(AdminStateMiddleware, admin=self),
         ]
         super().__init__(routes=routes, middleware=middleware)
+
+
+__all__ = ["AdminBase"]

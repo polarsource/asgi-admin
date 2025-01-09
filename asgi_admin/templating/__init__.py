@@ -13,8 +13,11 @@ env = Environment(
 )
 
 
-def navigation_context(request: Request) -> dict[str, Any]:
-    return {"navigation": request.state._asgi_admin_navigation}
+def state_context(request: Request) -> dict[str, Any]:
+    return {
+        "_asgi_admin_navigation": request.state._asgi_admin_navigation,
+        "_asgi_admin_title": request.state._asgi_admin_title,
+    }
 
 
 def _current_route(
@@ -32,11 +35,11 @@ def current_route_context(request: Request) -> dict[str, Union[str, None]]:
     app: Starlette = request.scope["app"]
     endpoint: Callable[..., Any] = request.scope["endpoint"]
     routes: list[Route] = cast(list[Route], app.routes)
-    return {"current_route": _current_route(routes, endpoint)}
+    return {"_asgi_admin_current_route": _current_route(routes, endpoint)}
 
 
 templates = Jinja2Templates(
-    env=env, context_processors=[navigation_context, current_route_context]
+    env=env, context_processors=[state_context, current_route_context]
 )
 
 __all__ = ["templates"]

@@ -35,6 +35,7 @@ dependencies = [
     "httpx",
     "beautifulsoup4",
     "types-beautifulsoup4",
+    "asgi-lifespan",
 ]
 
 [tool.hatch.envs.default.scripts]
