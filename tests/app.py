@@ -31,8 +31,8 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
             }
         self._items = items
 
-    async def list(self, offset: int, limit: int) -> Sequence[MyModel]:
-        return list(self._items.values())[offset : offset + limit]
+    async def paginate(self, offset: int, limit: int) -> tuple[int, Sequence[MyModel]]:
+        return len(self._items), list(self._items.values())[offset : offset + limit]
 
     async def create(self, item: MyModel) -> MyModel:
         self._items[item.id] = item

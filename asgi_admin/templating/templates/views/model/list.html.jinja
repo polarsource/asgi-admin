@@ -1,22 +1,53 @@
 {% extends "views/model/layout.html.jinja" %}
 
 {% block content %}
-<table class="table is-fullwidth is-hoverable is-bordered">
-  <thead>
-    <tr>
-      {% for field in fields %}
-      <th>{{ field }}</th>
+  <table class="is-fullwidth is-hoverable is-bordered table">
+    <thead>
+      <tr>
+        {% for field in fields %}
+          <th>{{ field }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          {% for field in fields %}
+            <td>{{ item[field] }}</td>
+          {% endfor %}
+        </tr>
       {% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in items %}
-    <tr>
-      {% for field in fields %}
-      <td>{{ item[field] }}</td>
-      {% endfor %}
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+    </tbody>
+  </table>
+  <div class="level">
+    <div class="level-left">
+      <div class="level-item">
+        Showing&nbsp;
+        <span class="has-text-weight-semibold">{{ pagination.range[0] }}</span>
+        &nbsp;to&nbsp;
+        <span class="has-text-weight-semibold">{{ pagination.range[1] }}</span>
+        &nbsp;of&nbsp;
+        <span class="has-text-weight-semibold">{{ pagination.total }}</span>
+        &nbsp;entries
+      </div>
+    </div>
+    <div class="level-right">
+      <div class="level-item">
+        <div class="buttons">
+          <a
+            class="button"
+            href="{{ pagination.previous_route or '' }}"
+            {{ 'disabled' if not pagination.previous_route else '' }}
+            >Previous</a
+          >
+          <a
+            class="button"
+            href="{{ pagination.next_route or '' }}"
+            {{ 'disabled' if not pagination.next_route else '' }}
+            >Next</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}

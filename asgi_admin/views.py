@@ -1,11 +1,14 @@
+import urllib
+import urllib.parse
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Any, ClassVar, Generic, TypeVar, Union
+from typing import Any, ClassVar, Generic, TypedDict, TypeVar, Union
 
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, Router
 
 from ._normalization import class_name_to_url_path
+from ._routing import get_current_route
 from .exceptions import ASGIAdminConfigurationError
 from .repository import Model, RepositoryProtocol
 from .templating import templates
@@ -147,6 +150,15 @@ class MissingModelViewListFieldsError(ViewConfigurationError):
         )
 
 
+class PaginationOutput(TypedDict):
+    offset: int
+    limit: int
+    total: int
+    range: tuple[int, int]
+    next_route: Union[str, None]
+    previous_route: Union[str, None]
+
+
 class ModelView(ViewBase, Generic[Model]):
     model: ClassVar[type[Any]]
     list_default_limit: ClassVar[int] = 10
@@ -169,16 +181,58 @@ class ModelView(ViewBase, Generic[Model]):
 
     @route("/", methods=["GET"], index=True)
     async def list(self, request: Request) -> Response:
-        offset, limit = self._get_pagination(request)
+        offset, limit = self._get_pagination_input(request)
         repository = await self.get_repository(request)
-        items = await repository.list(offset, limit)
+        total, items = await repository.paginate(offset, limit)
         return templates.TemplateResponse(
             request,
             "views/model/list.html.jinja",
-            {"page_title": self.title, "items": items, "fields": self.list_fields},
+            {
+                "page_title": self.title,
+                "items": items,
+                "fields": self.list_fields,
+                "pagination": self._get_pagination_output(
+                    request, offset, limit, total
+                ),
+            },
         )
 
-    def _get_pagination(self, request: Request) -> tuple[int, int]:
+    def _get_pagination_input(self, request: Request) -> tuple[int, int]:
         offset = int(request.query_params.get("offset", 0))
         limit = int(request.query_params.get("limit", self.list_default_limit))
         return offset, limit
+
+    def _get_pagination_output(
+        self, request: Request, offset: int, limit: int, total: int
+    ) -> PaginationOutput:
+        current_route = get_current_route(request)
+        assert current_route is not None
+
+        next_offset = offset + limit
+        next_query_params = urllib.parse.urlencode(
+            {**request.query_params, "offset": next_offset}
+        )
+        next_route = (
+            f"{request.url_for(current_route)}?{next_query_params}"
+            if next_offset < total
+            else None
+        )
+
+        previous_offset = offset - limit
+        previous_query_params = urllib.parse.urlencode(
+            {**request.query_params, "offset": previous_offset}
+        )
+        previous_route = (
+            f"{request.url_for(current_route)}?{previous_query_params}"
+            if previous_offset >= 0
+            else None
+        )
+
+        return {
+            "offset": offset,
+            "limit": limit,
+            "total": total,
+            "range": (offset, min(offset + limit, total)),
+            "next_route": next_route,
+            "previous_route": previous_route,
+        }

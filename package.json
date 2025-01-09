@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "prettier": "prettier --write gitspatch/templates/**/*.jinja2"
+  },
+  "dependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-jinja-template": "^2.0.0",
+    "prettier-plugin-tailwindcss": "^0.6.9"
+  }
+}

@@ -1,11 +1,12 @@
 from collections.abc import Callable
-from typing import Any, Union, cast
+from typing import Any, Union
 
 from jinja2 import Environment, PackageLoader, select_autoescape
-from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Route
 from starlette.templating import Jinja2Templates
+
+from .._routing import get_current_route
 
 env = Environment(
     loader=PackageLoader("asgi_admin.templating", "templates"),
@@ -32,10 +33,7 @@ def _current_route(
 
 
 def current_route_context(request: Request) -> dict[str, Union[str, None]]:
-    app: Starlette = request.scope["app"]
-    endpoint: Callable[..., Any] = request.scope["endpoint"]
-    routes: list[Route] = cast(list[Route], app.routes)
-    return {"_asgi_admin_current_route": _current_route(routes, endpoint)}
+    return {"_asgi_admin_current_route": get_current_route(request)}
 
 
 templates = Jinja2Templates(
