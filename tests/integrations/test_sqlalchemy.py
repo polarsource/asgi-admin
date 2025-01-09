@@ -106,3 +106,24 @@ class TestRepositoryList:
         )
         assert count == 1
         assert items == [item2]
+
+    async def test_query_non_string_field(self, session: AsyncSession) -> None:
+        item1 = MyModel(label="Item A")
+        session.add(item1)
+        item2 = MyModel(label="Item B")
+        session.add(item2)
+        item3 = MyModel(label="Item C")
+        session.add(item3)
+        await session.flush()
+
+        repository = MyModelRepository(session)
+
+        count, items = await repository.list(
+            [],
+            0,
+            10,
+            query=str(datetime.datetime.now(datetime.timezone.utc).year),
+            query_fields=["created_at"],
+        )
+        assert count == 3
+        assert items == [item1, item2, item3]

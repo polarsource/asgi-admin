@@ -4,7 +4,9 @@ from typing import Any, ClassVar, TypeVar, Union
 from sqlalchemy import (
     ColumnExpressionArgument,
     Select,
+    String,
     asc,
+    cast,
     desc,
     func,
     or_,
@@ -40,7 +42,9 @@ class RepositoryBase(RepositoryProtocol[Model]):
         if query is not None and query_fields is not None:
             clauses: list[ColumnExpressionArgument[bool]] = []
             for query_field in query_fields:
-                clauses.append(getattr(self.model, query_field).ilike(f"%{query}%"))
+                clauses.append(
+                    cast(getattr(self.model, query_field), String).ilike(f"%{query}%")
+                )
             statement = statement.where(or_(*clauses))
 
         for field, order in sorting:
