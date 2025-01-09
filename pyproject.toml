@@ -64,7 +64,7 @@ name = "asgi-admin"
 authors = [
   { name = "asgi-admin", email = "fvoron@gmail.com" }
 ]
-description = "Opinonated ASGI Admin builder"
+description = "A flexible admin builder for FastAPI, Starlette and ASGI apps"
 readme = "README.md"
 dynamic = ["version"]
 classifiers = [
@@ -83,5 +83,5 @@ sqlalchemy = [
 ]
 
 [project.urls]
-Documentation = "https://frankie567.github.io/asgi-admin/"
-Source = "https://github.com/frankie567/asgi-admin"
+Documentation = "https://polarsource.github.io/asgi-admin/"
+Source = "https://github.com/polarsource/asgi-admin"

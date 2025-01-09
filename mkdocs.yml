@@ -1,8 +1,8 @@
 site_name: ASGI Admin
-site_description: Opinonated ASGI Admin builder
+site_description: A flexible admin builder for FastAPI, Starlette and ASGI apps
 
-repo_url: https://github.com/frankie567/asgi-admin
-repo_name: frankie567/asgi-admin
+repo_url: https://github.com/polarsource/asgi-admin
+repo_name: polarsource/asgi-admin
 
 theme:
     name: material

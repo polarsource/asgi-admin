@@ -1,18 +1,18 @@
 # ASGI Admin
 
 <p align="center">
-    <em>Opinonated ASGI Admin builder</em>
+    <em>A flexible admin builder for FastAPI, Starlette and ASGI apps</em>
 </p>
 
-[![build](https://github.com/frankie567/asgi-admin/workflows/Build/badge.svg)](https://github.com/frankie567/asgi-admin/actions)
-[![codecov](https://codecov.io/gh/frankie567/asgi-admin/branch/master/graph/badge.svg)](https://codecov.io/gh/frankie567/asgi-admin)
+[![build](https://github.com/polarsource/asgi-admin/workflows/Build/badge.svg)](https://github.com/polarsource/asgi-admin/actions)
+[![codecov](https://codecov.io/gh/polarsource/asgi-admin/branch/master/graph/badge.svg)](https://codecov.io/gh/polarsource/asgi-admin)
 [![PyPI version](https://badge.fury.io/py/asgi-admin.svg)](https://badge.fury.io/py/asgi-admin)
 
 ---
 
-**Documentation**: <a href="https://frankie567.github.io/asgi-admin/" target="_blank">https://frankie567.github.io/asgi-admin/</a>
+**Documentation**: <a href="https://polarsource.github.io/asgi-admin/" target="_blank">https://polarsource.github.io/asgi-admin/</a>
 
-**Source Code**: <a href="https://github.com/frankie567/asgi-admin" target="_blank">https://github.com/frankie567/asgi-admin</a>
+**Source Code**: <a href="https://github.com/polarsource/asgi-admin" target="_blank">https://github.com/polarsource/asgi-admin</a>
 
 ---
 
