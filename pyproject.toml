@@ -36,6 +36,7 @@ dependencies = [
     "beautifulsoup4",
     "types-beautifulsoup4",
     "asgi-lifespan",
+    "aiosqlite",
 ]
 
 [tool.hatch.envs.default.scripts]
