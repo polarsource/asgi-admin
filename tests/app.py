@@ -1,6 +1,6 @@
 import dataclasses
 import datetime
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from operator import attrgetter
 from typing import Union
 
@@ -19,25 +19,45 @@ class MyModel:
     created_at: datetime.datetime
 
 
+_default_items = {
+    f"item_{i}": MyModel(
+        id=f"item_{i}",
+        label=f"Item {i}",
+        created_at=datetime.datetime.now(),
+    )
+    for i in range(10)
+}
+
+
 class MyModelRepository(RepositoryProtocol[MyModel]):
-    def __init__(self, items: Union[dict[str, MyModel], None] = None) -> None:
-        if items is None:
-            items = {
-                f"item_{i}": MyModel(
-                    id=f"item_{i}",
-                    label=f"Item {i}",
-                    created_at=datetime.datetime.now(),
-                )
-                for i in range(10)
-            }
+    def __init__(self, items: dict[str, MyModel] = _default_items) -> None:
         self._items = items
 
-    async def paginate(
-        self, sorting: Sorting, offset: int, limit: int
+    async def list(
+        self,
+        sorting: Sorting,
+        offset: int,
+        limit: int,
+        *,
+        query: Union[str, None] = None,
+        query_fields: Union[Iterable[str], None] = None,
     ) -> tuple[int, Sequence[MyModel]]:
-        items = list(self._items.values())
+        # Filtering
+        def _filter_function(item: MyModel) -> bool:
+            if query is None or not query_fields:
+                return True
+            for query_field in query_fields:
+                if query.lower() in str(getattr(item, query_field)).lower():
+                    return True
+            return False
+
+        items = [item for item in list(self._items.values()) if _filter_function(item)]
+
+        # Sorting
         for field, way in reversed(sorting):
             items.sort(key=attrgetter(field), reverse=way == SortingOrder.DESC)
+
+        # Offset and limit
         return len(items), items[offset : offset + limit]
 
     async def create(self, item: MyModel) -> MyModel:
@@ -49,6 +69,7 @@ class MyModelView(ModelView[MyModel]):
     model = MyModel
     field_labels = {"id": "ID", "label": "Label", "created_at": "Created At"}
     list_fields = ("id", "label", "created_at")
+    list_query_fields = ("id", "label")
 
     async def get_repository(self, request: Request) -> MyModelRepository:
         return MyModelRepository()

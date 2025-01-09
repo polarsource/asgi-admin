@@ -174,6 +174,7 @@ class ModelView(ViewBase, Generic[Model]):
     list_default_limit: ClassVar[int] = 10
     list_fields: ClassVar[Sequence[str]]
     list_sortable_fields: ClassVar[Iterable[str]]
+    list_query_fields: ClassVar[Iterable[str]] = ()
 
     def __init_subclass__(cls, **kwargs):
         if not hasattr(cls, "model"):
@@ -195,9 +196,12 @@ class ModelView(ViewBase, Generic[Model]):
     async def list(self, request: Request) -> Response:
         offset, limit = self._get_pagination_input(request)
         sorting = self._get_sorting_input(request)
+        query = await self._get_query_input(request)
 
         repository = await self.get_repository(request)
-        total, items = await repository.paginate(sorting, offset, limit)
+        total, items = await repository.list(
+            sorting, offset, limit, query=query, query_fields=self.list_query_fields
+        )
         return templates.TemplateResponse(
             request,
             "views/model/list.html.jinja",
@@ -209,6 +213,7 @@ class ModelView(ViewBase, Generic[Model]):
                     request, offset, limit, total
                 ),
                 "sorting": self._get_sorting_output(request, sorting),
+                "query": query,
             },
         )
 
@@ -303,3 +308,9 @@ class ModelView(ViewBase, Generic[Model]):
             return f"{request.url_for(current_route)}?{query_params}"
 
         return {"fields": fields, "get_sorting_route": get_sorting_route}
+
+    async def _get_query_input(self, request: Request) -> Union[str, None]:
+        query = request.query_params.get("query")
+        if query is not None:
+            return query.strip()
+        return None
