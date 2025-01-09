@@ -1,6 +1,6 @@
 import dataclasses
 import datetime
-from collections.abc import Iterable, Sequence
+from collections.abc import AsyncIterator, Iterable, Sequence
 from operator import attrgetter
 from typing import Union
 
@@ -71,8 +71,10 @@ class MyModelView(ModelView[MyModel]):
     list_fields = ("id", "label", "created_at")
     list_query_fields = ("id", "label")
 
-    async def get_repository(self, request: Request) -> MyModelRepository:
-        return MyModelRepository()
+    async def get_repository(
+        self, request: Request
+    ) -> AsyncIterator[MyModelRepository]:
+        yield MyModelRepository()
 
 
 class MyAdmin(AdminBase):

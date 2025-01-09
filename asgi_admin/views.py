@@ -1,7 +1,21 @@
+import contextlib
 import urllib
 import urllib.parse
-from collections.abc import Awaitable, Callable, Iterable, Sequence
-from typing import Any, ClassVar, Generic, TypedDict, TypeVar, Union
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Sequence,
+)
+from typing import (
+    Any,
+    ClassVar,
+    Generic,
+    TypedDict,
+    TypeVar,
+    Union,
+)
 
 from starlette.requests import Request
 from starlette.responses import Response
@@ -189,8 +203,20 @@ class ModelView(ViewBase, Generic[Model]):
             cls.list_sortable_fields = cls.list_fields
         super().__init_subclass__(**kwargs)
 
-    async def get_repository(self, request: Request) -> RepositoryProtocol[Model]:
+    def __init__(self) -> None:
+        super().__init__()
+        self._get_repository_context = contextlib.asynccontextmanager(
+            self.get_repository
+        )
+
+    async def get_repository(
+        self, request: Request
+    ) -> AsyncIterator[RepositoryProtocol[Model]]:
         raise NotImplementedError()
+        # Trick to make mypy happy about this method being an async iterator
+        # Ref: https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
+        if False:
+            yield
 
     @route("/", methods=["GET"], index=True)
     async def list(self, request: Request) -> Response:
@@ -198,10 +224,10 @@ class ModelView(ViewBase, Generic[Model]):
         sorting = self._get_sorting_input(request)
         query = await self._get_query_input(request)
 
-        repository = await self.get_repository(request)
-        total, items = await repository.list(
-            sorting, offset, limit, query=query, query_fields=self.list_query_fields
-        )
+        async with self._get_repository_context(request) as repository:
+            total, items = await repository.list(
+                sorting, offset, limit, query=query, query_fields=self.list_query_fields
+            )
         return templates.TemplateResponse(
             request,
             "views/model/list.html.jinja",
