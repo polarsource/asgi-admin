@@ -11,7 +11,7 @@
             type="text"
             placeholder="Filter by {{ view.list_query_fields | join(', ') }}"
             name="query"
-            value="{{ query }}"
+            value="{{ query or '' }}"
           />
         </form>
       {% endif %}
