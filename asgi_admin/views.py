@@ -7,6 +7,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, Router
 
+from ._constants import ROUTE_NAME_PREFIX
 from ._normalization import class_name_to_url_path
 from ._routing import get_current_route
 from .exceptions import ASGIAdminConfigurationError
@@ -102,7 +103,10 @@ class ViewBase:
             attr_value = getattr(self, attr_name)
             if hasattr(attr_value, "_route_info"):
                 route_info = attr_value._route_info
-                name = route_info["name"] or f"{self.__class__.__name__}.{attr_name}"
+                name = (
+                    route_info["name"]
+                    or f"{ROUTE_NAME_PREFIX}{self.__class__.__name__}.{attr_name}"
+                )
                 route = Route(
                     route_info["path"],
                     attr_value,

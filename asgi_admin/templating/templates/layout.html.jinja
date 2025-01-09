@@ -1,19 +1,25 @@
 {% extends "base.html.jinja" %}
 
 {% block body %}
-<div class="columns">
-  <aside class="menu column is-2 is-narrow-mobile is-fullheight section is-hidden-mobile">
-    <ul class="menu-list">
-      {% for item in _asgi_admin_navigation %}
-        <li><a class="{{ 'is-active' if _asgi_admin_current_route == item.index_route else ''}}" href="{{ url_for(item.index_route) }}">{{ item.title }}</a></li>
-      {% endfor %}
-    </ul>
-  </aside>
+  <div class="columns">
+    <aside
+      class="menu column is-2 is-narrow-mobile is-fullheight section is-hidden-mobile"
+    >
+      <ul class="menu-list">
+        {% for item in _asgi_admin_navigation %}
+          <li>
+            <a
+              class="{{ 'is-active' if _asgi_admin_current_route == item.index_route else '' }}"
+              href="{{ url_for(item.index_route) }}"
+              >{{ item.title }}</a
+            >
+          </li>
+        {% endfor %}
+      </ul>
+    </aside>
 
-  <main class="column is-10 section is-background-grey-lighter">
-    <div class="container">
-      {% block container %}{% endblock %}
-    </div>
-  </main>
-</div>
+    <main class="column is-10 section is-background-grey-lighter">
+      <div class="container">{% block container %}{% endblock %}</div>
+    </main>
+  </div>
 {% endblock %}

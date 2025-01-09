@@ -6,18 +6,31 @@ from starlette.requests import Request
 from starlette.routing import Route
 from starlette.templating import Jinja2Templates
 
+from .._constants import (
+    CONTEXT_CURRENT_ROUTE_KEY,
+    CONTEXT_NAVIGATION_KEY,
+    CONTEXT_TITLE_KEY,
+    SCOPE_NAVIGATION_KEY,
+    SCOPE_TITLE_KEY,
+)
 from .._routing import get_current_route
 
 env = Environment(
     loader=PackageLoader("asgi_admin.templating", "templates"),
     autoescape=select_autoescape(),
 )
+env.globals = {
+    **env.globals,
+    CONTEXT_NAVIGATION_KEY: CONTEXT_NAVIGATION_KEY,
+    CONTEXT_TITLE_KEY: CONTEXT_TITLE_KEY,
+    CONTEXT_CURRENT_ROUTE_KEY: CONTEXT_CURRENT_ROUTE_KEY,
+}
 
 
 def state_context(request: Request) -> dict[str, Any]:
     return {
-        "_asgi_admin_navigation": request.state._asgi_admin_navigation,
-        "_asgi_admin_title": request.state._asgi_admin_title,
+        CONTEXT_NAVIGATION_KEY: getattr(request.state, SCOPE_NAVIGATION_KEY),
+        CONTEXT_TITLE_KEY: getattr(request.state, SCOPE_TITLE_KEY),
     }
 
 
@@ -33,7 +46,7 @@ def _current_route(
 
 
 def current_route_context(request: Request) -> dict[str, Union[str, None]]:
-    return {"_asgi_admin_current_route": get_current_route(request)}
+    return {CONTEXT_CURRENT_ROUTE_KEY: get_current_route(request)}
 
 
 templates = Jinja2Templates(

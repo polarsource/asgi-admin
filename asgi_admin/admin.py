@@ -6,6 +6,7 @@ from starlette.responses import Response
 from starlette.routing import Mount, Route, Router
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from ._constants import ROUTE_NAME_PREFIX, SCOPE_NAVIGATION_KEY, SCOPE_TITLE_KEY
 from .templating import templates
 from .views import ViewBase
 
@@ -17,20 +18,21 @@ class AdminStateMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket"):
-            scope["state"]["_asgi_admin_navigation"] = [
+            scope["state"][SCOPE_NAVIGATION_KEY] = [
                 {
                     "title": view.title,
                     "index_route": view.index_route.name,
                 }
                 for view in self.admin.views
             ]
-            scope["state"]["_asgi_admin_title"] = self.admin.title
+            scope["state"][SCOPE_TITLE_KEY] = self.admin.title
         await self.app(scope, receive, send)
 
 
 class AdminBase(Router):
     views: ClassVar[list[ViewBase]] = []
     title: ClassVar[str]
+    index_route_name: ClassVar[str] = f"{ROUTE_NAME_PREFIX}.index"
 
     def __init_subclass__(cls) -> None:
         if not hasattr(cls, "title"):
@@ -39,7 +41,7 @@ class AdminBase(Router):
 
     def __init__(self) -> None:
         routes = [
-            Route("/", self.index, methods=["GET"], name="index"),
+            Route("/", self.index, methods=["GET"], name=self.index_route_name),
             *(Mount(view.prefix, view.router) for view in self.views),
         ]
         middleware = [
