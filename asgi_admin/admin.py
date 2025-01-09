@@ -1,10 +1,13 @@
 from typing import ClassVar
 
 from starlette.middleware import Middleware
-from starlette.routing import Mount, Router
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Mount, Route, Router
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from asgi_admin.views import ViewBase
+from .templating import templates
+from .views import ViewBase
 
 
 class AdminStateMiddleware:
@@ -35,11 +38,17 @@ class AdminBase(Router):
         return super().__init_subclass__()
 
     def __init__(self) -> None:
-        routes = [Mount(view.prefix, view.router) for view in self.views]
+        routes = [
+            Route("/", self.index, methods=["GET"], name="index"),
+            *(Mount(view.prefix, view.router) for view in self.views),
+        ]
         middleware = [
             Middleware(AdminStateMiddleware, admin=self),
         ]
         super().__init__(routes=routes, middleware=middleware)
+
+    async def index(self, request: Request) -> Response:
+        return templates.TemplateResponse(request, "index.html.jinja")
 
 
 __all__ = ["AdminBase"]
