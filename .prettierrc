@@ -1,5 +1,5 @@
 {
-  "plugins": ["prettier-plugin-jinja-template", "prettier-plugin-tailwindcss"],
+  "plugins": ["prettier-plugin-jinja-template"],
   "tabWidth": 2,
   "useTabs": false
 }

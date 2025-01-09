@@ -1,5 +1,25 @@
 {% extends "base.html.jinja" %}
 
+{% block head %}
+  <style>
+    .menu {
+      background-color: var(--bulma-white-ter);
+      --bulma-menu-item-h: 220;
+      --bulma-menu-item-s: 14%;
+      --bulma-menu-item-background-l: 96%;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .menu {
+        background-color: var(--bulma-black-ter);
+        --bulma-menu-item-h: 222;
+        --bulma-menu-item-s: 14%;
+        --bulma-menu-item-background-l: 14%;
+      }
+    }
+  </style>
+{% endblock %}
+
 {% block body %}
   <div class="columns">
     <aside
