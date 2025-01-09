@@ -163,17 +163,17 @@ class ModelView(ViewBase, Generic[Model]):
     model: ClassVar[type[Any]]
     list_default_limit: ClassVar[int] = 10
     list_fields: ClassVar[Iterable[str]]
+    field_labels: ClassVar[dict[str, str]] = {}
 
     def __init_subclass__(cls, **kwargs):
-        if not any(issubclass(subclass, cls) for subclass in cls.__subclasses__()):
-            if not hasattr(cls, "model"):
-                raise MissingModelViewModelError(cls)
-            if not hasattr(cls, "list_fields"):
-                raise MissingModelViewListFieldsError(cls)
-            if not hasattr(cls, "title"):
-                cls.title = cls.model.__name__
-            if not hasattr(cls, "prefix"):
-                cls.prefix = f"/{class_name_to_url_path(cls.model.__name__)}"
+        if not hasattr(cls, "model"):
+            raise MissingModelViewModelError(cls)
+        if not hasattr(cls, "list_fields"):
+            raise MissingModelViewListFieldsError(cls)
+        if not hasattr(cls, "title"):
+            cls.title = cls.model.__name__
+        if not hasattr(cls, "prefix"):
+            cls.prefix = f"/{class_name_to_url_path(cls.model.__name__)}"
         super().__init_subclass__(**kwargs)
 
     async def get_repository(self, request: Request) -> RepositoryProtocol[Model]:
@@ -189,8 +189,8 @@ class ModelView(ViewBase, Generic[Model]):
             "views/model/list.html.jinja",
             {
                 "page_title": self.title,
+                "view": self,
                 "items": items,
-                "fields": self.list_fields,
                 "pagination": self._get_pagination_output(
                     request, offset, limit, total
                 ),

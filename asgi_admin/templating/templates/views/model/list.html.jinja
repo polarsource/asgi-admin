@@ -4,15 +4,15 @@
   <table class="is-fullwidth is-hoverable is-bordered table">
     <thead>
       <tr>
-        {% for field in fields %}
-          <th>{{ field }}</th>
+        {% for field in view.list_fields %}
+          <th>{{ view.field_labels[field] or field }}</th>
         {% endfor %}
       </tr>
     </thead>
     <tbody>
       {% for item in items %}
         <tr>
-          {% for field in fields %}
+          {% for field in view.list_fields %}
             <td>{{ item[field] }}</td>
           {% endfor %}
         </tr>
