@@ -1,5 +1,18 @@
 {% extends "layout.html.jinja" %}
 
+{% block head %}
+  {{ super() }}
+  <style>
+    td button.copy-cell-button {
+      visibility: hidden;
+    }
+
+    td:hover button.copy-cell-button {
+      visibility: visible;
+    }
+  </style>
+{% endblock %}
+
 {% block container %}
   <section class="section">
     <nav class="breadcrumb" aria-label="breadcrumbs">

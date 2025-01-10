@@ -1,0 +1,19 @@
+{% import "macros/icons.html.jinja" as icons %}
+
+{% macro copy(text, class = "") %}
+  <button
+    type="button"
+    class="{{ class }}"
+    _="
+    on click call navigator.clipboard.writeText('{{ text }}')
+    then add @disabled to me
+    then toggle .is-hidden on <svg /> in me
+    then wait 5s
+    then toggle .is-hidden on <svg /> in me
+    then remove @disabled from me
+  "
+  >
+    {{ icons.clipboard("icon is-small") }}
+    {{ icons.clipboard_document_check("icon is-small is-hidden") }}
+  </button>
+{% endmacro %}

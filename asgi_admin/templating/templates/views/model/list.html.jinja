@@ -1,4 +1,6 @@
 {% extends "views/model/layout.html.jinja" %}
+{% import "macros/icons.html.jinja" as icons %}
+{% import "macros/clipboard.html.jinja" as clipboard %}
 
 {% block content %}
   <div class="level">
@@ -24,14 +26,18 @@
           <th>
             {% if field in view.list_sortable_fields %}
               <a class="" href="{{ sorting.get_sorting_route(field) }}">
-                {{ view.field_labels[field] or field }}
-                {% if sorting.fields[field] %}
-                  {% if sorting.fields[field] == "ASC" %}
-                    ⬇️
+                <span class="icon-text">
+                  {{ view.field_labels[field] or field }}
+                  {% if sorting.fields[field] %}
+                    {% if sorting.fields[field] == "ASC" %}
+                      {{ icons.arrow_long_down("icon is-small") }}
+                    {% else %}
+                      {{ icons.arrow_long_up("icon is-small") }}
+                    {% endif %}
                   {% else %}
-                    ⬆️
+                    <span class="icon is-small"></span>
                   {% endif %}
-                {% endif %}
+                </span>
               </a>
             {% else %}
               {{ view.field_labels[field] or field }}
@@ -45,14 +51,17 @@
         <tr>
           {% for field in view.list_fields %}
             <td>
-              {% if loop.first %}
-                <a
-                  href="{{ request.url_for(view.edit.name, id=view.model_id_getter(item)) }}"
-                  >{{ item[field] }}</a
-                >
-              {% else %}
-                {{ item[field] }}
-              {% endif %}
+              <div class="is-flex is-justify-content-space-between">
+                {% if loop.first %}
+                  <a
+                    href="{{ request.url_for(view.edit.name, id=view.model_id_getter(item)) }}"
+                    >{{ item[field] }}</a
+                  >
+                {% else %}
+                  {{ item[field] }}
+                {% endif %}
+                {{ clipboard.copy(item[field], class="copy-cell-button") }}
+              </div>
             </td>
           {% endfor %}
         </tr>
