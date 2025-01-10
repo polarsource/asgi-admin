@@ -2,10 +2,11 @@ import dataclasses
 import datetime
 from collections.abc import AsyncIterator, Iterable, Sequence
 from operator import attrgetter
-from typing import Union
+from typing import Any, Union
 
 from starlette.applications import Starlette
 from starlette.requests import Request
+from wtforms import StringField, validators
 
 from asgi_admin.admin import AdminBase
 from asgi_admin.repository import RepositoryProtocol, Sorting, SortingOrder
@@ -19,7 +20,7 @@ class MyModel:
     created_at: datetime.datetime
 
 
-_default_items = {
+ITEMS = {
     f"item_{i}": MyModel(
         id=f"item_{i}",
         label=f"Item {i}",
@@ -30,7 +31,7 @@ _default_items = {
 
 
 class MyModelRepository(RepositoryProtocol[MyModel]):
-    def __init__(self, items: dict[str, MyModel] = _default_items) -> None:
+    def __init__(self, items: dict[str, MyModel] = ITEMS) -> None:
         self._items = items
 
     async def list(
@@ -60,6 +61,13 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
         # Offset and limit
         return len(items), items[offset : offset + limit]
 
+    async def get_by_id(self, id: str) -> Union[MyModel, None]:
+        return self._items.get(id)
+
+    async def update(self, item: MyModel, data: dict[str, Any]) -> MyModel:
+        self._items[item.id] = dataclasses.replace(item, **data)
+        return self._items[item.id]
+
     async def create(self, item: MyModel) -> MyModel:
         self._items[item.id] = item
         return item
@@ -68,13 +76,28 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
 class MyModelView(ModelView[MyModel]):
     model = MyModel
     field_labels = {"id": "ID", "label": "Label", "created_at": "Created At"}
+
     list_fields = ("id", "label", "created_at")
     list_query_fields = ("id", "label")
+
+    edit_fields = (
+        (
+            "label",
+            StringField(
+                "Label",
+                description="The label of the item",
+                validators=[validators.InputRequired(), validators.Length(min=3)],
+            ),
+        ),
+    )
 
     async def get_repository(
         self, request: Request
     ) -> AsyncIterator[MyModelRepository]:
         yield MyModelRepository()
+
+    async def get_item_title(self, request: Request, item: MyModel) -> str:
+        return item.label
 
 
 class MyAdmin(AdminBase):

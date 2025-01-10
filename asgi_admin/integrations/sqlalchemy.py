@@ -64,6 +64,20 @@ class RepositoryBase(RepositoryProtocol[Model]):
 
         return count, items
 
+    async def get_by_id(self, id: Any) -> Union[Model, None]:
+        statement = self.get_base_select().where(self.model.id == id)
+        result = await self.session.execute(statement)
+        return result.scalar_one_or_none()
+
+    async def update(
+        self, item: Model, data: dict[str, Any], *, autoflush: bool = True
+    ) -> Model:
+        for key, value in data.items():
+            setattr(item, key, value)
+        if autoflush:
+            await self.session.flush()
+        return item
+
     async def create(self, item: Model, *, autoflush: bool = True) -> Model:
         self.session.add(item)
         if autoflush:

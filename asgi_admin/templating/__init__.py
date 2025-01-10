@@ -19,12 +19,6 @@ env = Environment(
     loader=PackageLoader("asgi_admin.templating", "templates"),
     autoescape=select_autoescape(),
 )
-env.globals = {
-    **env.globals,
-    CONTEXT_NAVIGATION_KEY: CONTEXT_NAVIGATION_KEY,
-    CONTEXT_TITLE_KEY: CONTEXT_TITLE_KEY,
-    CONTEXT_CURRENT_ROUTE_KEY: CONTEXT_CURRENT_ROUTE_KEY,
-}
 
 
 def state_context(request: Request) -> dict[str, Any]:

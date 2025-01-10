@@ -5,6 +5,17 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Route
 
+from .exceptions import ASGIAdminError
+
+
+class CurrentRouteNotFound(ASGIAdminError):
+    """
+    Raised when the current route is not found.
+    """
+
+    def __init__(self) -> None:  # pragma: no cover
+        super().__init__("Current route not found.")
+
 
 def _get_current_route(
     routes: list[Route], endpoint: Callable[..., Any]
@@ -14,7 +25,7 @@ def _get_current_route(
             return route.name
         if sub_route := getattr(route, "routes", None):
             return _get_current_route(sub_route, endpoint)
-    return None
+    raise CurrentRouteNotFound()  # pragma: no cover
 
 
 def get_current_route(request: Request) -> Union[str, None]:

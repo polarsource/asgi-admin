@@ -37,6 +37,7 @@ dependencies = [
     "types-beautifulsoup4",
     "asgi-lifespan",
     "aiosqlite",
+    "types-WTForms",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -74,8 +75,10 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-    "starlette",
     "jinja2",
+    "python-multipart",
+    "starlette",
+    "WTForms",
 ]
 
 [project.optional-dependencies]

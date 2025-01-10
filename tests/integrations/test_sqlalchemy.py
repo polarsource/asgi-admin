@@ -127,3 +127,33 @@ class TestRepositoryList:
         )
         assert count == 3
         assert items == [item1, item2, item3]
+
+
+@pytest.mark.asyncio
+class TestRepositoryGetById:
+    async def test_not_existing(self, session: AsyncSession) -> None:
+        repository = MyModelRepository(session)
+        item = await repository.get_by_id(1)
+        assert item is None
+
+    async def test_existing(self, session: AsyncSession) -> None:
+        item = MyModel(label="Item 1")
+        session.add(item)
+        await session.flush()
+
+        repository = MyModelRepository(session)
+        result = await repository.get_by_id(item.id)
+        assert result == item
+
+
+@pytest.mark.asyncio
+class TestRepositoryUpdate:
+    async def test_basic(self, session: AsyncSession) -> None:
+        item = MyModel(label="Item 1")
+        session.add(item)
+        await session.flush()
+
+        repository = MyModelRepository(session)
+        result = await repository.update(item, {"label": "Item Updated"})
+        assert result.label == "Item Updated"
+        assert result.created_at == item.created_at

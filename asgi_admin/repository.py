@@ -1,10 +1,11 @@
 from collections.abc import Iterable, Sequence
 from enum import Enum
-from typing import Protocol, TypeVar, Union
+from typing import Any, Protocol, TypeVar, Union
 
 from typing_extensions import TypeAlias
 
 Model = TypeVar("Model")
+IDType = TypeVar("IDType")
 
 
 class SortingOrder(str, Enum):
@@ -25,5 +26,9 @@ class RepositoryProtocol(Protocol[Model]):
         query: Union[str, None] = None,
         query_fields: Union[Iterable[str], None] = None,
     ) -> tuple[int, Sequence[Model]]: ...
+
+    async def get_by_id(self, id: Any) -> Union[Model, None]: ...
+
+    async def update(self, item: Model, data: dict[str, Any]) -> Model: ...
 
     async def create(self, item: Model) -> Model: ...

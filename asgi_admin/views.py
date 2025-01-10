@@ -17,6 +17,7 @@ from typing import (
     Union,
 )
 
+import wtforms
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, Router
@@ -24,7 +25,7 @@ from starlette.routing import Route, Router
 from ._constants import ROUTE_NAME_PREFIX
 from ._normalization import class_name_to_url_path
 from ._routing import get_current_route
-from .exceptions import ASGIAdminConfigurationError
+from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
 from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
 from .templating import templates
 
@@ -168,6 +169,17 @@ class MissingModelViewListFieldsError(ViewConfigurationError):
         )
 
 
+def _build_form_class(
+    fields: Sequence[tuple[str, wtforms.Field]],
+) -> type[wtforms.Form]:
+    class Form(wtforms.Form):
+        pass
+
+    for field_name, field in fields:
+        setattr(Form, field_name, field)
+    return Form
+
+
 class PaginationOutput(TypedDict):
     offset: int
     limit: int
@@ -185,10 +197,14 @@ class SortingOutput(TypedDict):
 class ModelView(ViewBase, Generic[Model]):
     model: ClassVar[type[Any]]
     field_labels: ClassVar[dict[str, str]] = {}
+
     list_default_limit: ClassVar[int] = 10
     list_fields: ClassVar[Sequence[str]]
     list_sortable_fields: ClassVar[Iterable[str]]
     list_query_fields: ClassVar[Iterable[str]] = ()
+
+    edit_fields: ClassVar[Sequence[tuple[str, wtforms.Field]]] = ()
+    edit_form_class: ClassVar[type[wtforms.Form]]
 
     def __init_subclass__(cls, **kwargs):
         if not hasattr(cls, "model"):
@@ -201,6 +217,8 @@ class ModelView(ViewBase, Generic[Model]):
             cls.prefix = f"/{class_name_to_url_path(cls.model.__name__)}"
         if not hasattr(cls, "list_sortable_fields"):
             cls.list_sortable_fields = cls.list_fields
+        if not hasattr(cls, "edit_form_class"):
+            cls.edit_form_class = _build_form_class(cls.edit_fields)
         super().__init_subclass__(**kwargs)
 
     def __init__(self) -> None:
@@ -211,12 +229,15 @@ class ModelView(ViewBase, Generic[Model]):
 
     async def get_repository(
         self, request: Request
-    ) -> AsyncIterator[RepositoryProtocol[Model]]:
+    ) -> AsyncIterator[RepositoryProtocol[Model]]:  # pragma: no cover
         raise NotImplementedError()
         # Trick to make mypy happy about this method being an async iterator
         # Ref: https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
         if False:
             yield
+
+    async def get_item_title(self, request: Request, item: Model) -> str:
+        return str(item)
 
     @route("/", methods=["GET"], index=True)
     async def list(self, request: Request) -> Response:
@@ -241,6 +262,36 @@ class ModelView(ViewBase, Generic[Model]):
                 "sorting": self._get_sorting_output(request, sorting),
                 "query": query,
             },
+        )
+
+    @route("/{id}", methods=["GET", "POST"])
+    async def edit(self, request: Request) -> Response:
+        async with self._get_repository_context(request) as repository:
+            item = await repository.get_by_id(request.path_params["id"])
+            if item is None:
+                raise ASGIAdminNotFound()
+
+            form_data = await request.form()
+            form = self.edit_form_class(form_data, obj=item)
+
+            status_code = 200
+            if request.method == "POST":
+                if form.validate():
+                    item = await repository.update(item, form.data)
+                    # TODO: Success message
+                else:
+                    status_code = 400
+
+        return templates.TemplateResponse(
+            request,
+            "views/model/edit.html.jinja",
+            {
+                "page_title": await self.get_item_title(request, item),
+                "view": self,
+                "item": item,
+                "form": form,
+            },
+            status_code=status_code,
         )
 
     def _get_pagination_input(self, request: Request) -> tuple[int, int]:

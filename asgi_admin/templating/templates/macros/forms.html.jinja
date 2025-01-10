@@ -1,0 +1,33 @@
+<div class="field">
+  <label class="label">Email</label>
+  <div class="control has-icons-left has-icons-right">
+    <input
+      class="input is-danger"
+      type="email"
+      placeholder="Email input"
+      value="hello@"
+    />
+    <span class="icon is-small is-left">
+      <i class="fas fa-envelope"></i>
+    </span>
+    <span class="icon is-small is-right">
+      <i class="fas fa-exclamation-triangle"></i>
+    </span>
+  </div>
+  <p class="help is-danger">This email is invalid</p>
+</div>
+
+{% macro form_field(field) %}
+  <div class="field">
+    <label class="label">{{ field.label }}</label>
+    <div class="control">
+      {{ field(class="input " ~ (" is-danger" if field.errors else "")) }}
+    </div>
+    {% for error in field.errors %}
+      <p class="help is-danger">{{ error }}</p>
+    {% endfor %}
+    {% if field.description %}
+      <p class="help">{{ field.description }}</p>
+    {% endif %}
+  </div>
+{% endmacro %}
