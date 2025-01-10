@@ -71,7 +71,7 @@ class TestModelViewList:
         tbody_tr_items = parsed.find_all("tbody")[0].find_all("tr")
         assert len(tbody_tr_items) == len(ITEMS)
         td_id = tbody_tr_items[0].find_all("td")[0]
-        assert td_id.text == ITEMS[list(ITEMS.keys())[-1]].id
+        assert td_id.text.strip() == ITEMS[list(ITEMS.keys())[-1]].id
 
     async def test_query(self, client: httpx.AsyncClient) -> None:
         response = await client.get("/admin/my-model/", params={"query": "item 0"})
@@ -81,7 +81,7 @@ class TestModelViewList:
         tbody_tr_items = parsed.find_all("tbody")[0].find_all("tr")
         assert len(tbody_tr_items) == 1
         td_id = tbody_tr_items[0].find_all("td")[0]
-        assert td_id.text == FIRST_ITEM.id
+        assert td_id.text.strip() == FIRST_ITEM.id
 
 
 @pytest.mark.asyncio

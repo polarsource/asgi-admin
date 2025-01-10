@@ -11,7 +11,7 @@ from .._constants import (
     SCOPE_NAVIGATION_KEY,
     SCOPE_TITLE_KEY,
 )
-from .._routing import get_current_route
+from .._routing import RouteView, get_current_route
 
 env = Environment(
     loader=PackageLoader("asgi_admin.templating", "templates"),
@@ -26,7 +26,7 @@ def state_context(request: Request) -> dict[str, Any]:
     }
 
 
-def current_route_context(request: Request) -> dict[str, Union[str, None]]:
+def current_route_context(request: Request) -> dict[str, Union[RouteView, None]]:
     return {CONTEXT_CURRENT_ROUTE_KEY: get_current_route(request)}
 
 

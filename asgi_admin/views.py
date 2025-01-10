@@ -1,4 +1,6 @@
 import contextlib
+import functools
+import secrets
 import urllib
 import urllib.parse
 from collections.abc import (
@@ -26,7 +28,7 @@ from starlette.routing import Route, Router
 
 from ._constants import ROUTE_NAME_PREFIX
 from ._normalization import class_name_to_url_path
-from ._routing import get_current_route
+from ._routing import RouteView, get_current_route
 from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
 from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
 from .templating import templates
@@ -35,21 +37,44 @@ ViewType = TypeVar("ViewType", bound="ViewBase")
 RouteType = Callable[[ViewType, Request], Awaitable[Response]]
 
 
+class _DecoratedRoute:
+    handler: RouteType
+    path: str
+    methods: list[str]
+    name: str
+    index: bool
+
+    def __init__(
+        self,
+        handler: RouteType,
+        path: str,
+        methods: list[str],
+        *,
+        name: Union[str, None] = None,
+        index: bool = False,
+    ) -> None:
+        self.handler = handler
+        self.path = path
+        self.methods = methods
+        if name is None:
+            name = (
+                f"{ROUTE_NAME_PREFIX}{self.handler.__name__}.{secrets.token_urlsafe(4)}"
+            )
+        self.name = name
+        self.index = index
+
+        self.__call__ = self.handler
+
+
 def route(
     path: str,
     methods: list[str],
     *,
     name: Union[str, None] = None,
     index: bool = False,
-) -> Callable[[RouteType], RouteType]:
-    def decorator(func: RouteType) -> RouteType:
-        func._route_info = {  # type: ignore
-            "path": path,
-            "methods": methods,
-            "name": name,
-            "index": index,
-        }
-        return func
+) -> Callable[[RouteType], _DecoratedRoute]:
+    def decorator(func: RouteType) -> _DecoratedRoute:
+        return _DecoratedRoute(func, path, methods, name=name, index=index)
 
     return decorator
 
@@ -106,8 +131,6 @@ class ViewBase:
     router: Router
     index_route: Route
 
-    _endpoint_route_name_map: dict[Callable[..., Any], str]
-
     def __init_subclass__(cls, **kwargs) -> None:
         if cls.__name__ != "ModelView":
             if not hasattr(cls, "title"):
@@ -118,24 +141,23 @@ class ViewBase:
 
     def __init__(self) -> None:
         routes: list[Route] = []
-        _endpoint_route_name_map: dict[RouteType, str] = {}
         for attr_name in dir(self):
             attr_value = getattr(self, attr_name)
-            if hasattr(attr_value, "_route_info"):
-                route_info = attr_value._route_info
+            if isinstance(attr_value, _DecoratedRoute):
                 name = (
-                    route_info["name"]
+                    attr_value.name
                     or f"{ROUTE_NAME_PREFIX}{self.__class__.__name__}.{attr_name}"
                 )
-                route = Route(
-                    route_info["path"],
-                    attr_value,
-                    methods=route_info["methods"],
+                handler = functools.partial(attr_value.handler, self)
+                route = RouteView(
+                    attr_value.path,
+                    handler,
+                    self,
+                    methods=attr_value.methods,
                     name=name,
                 )
                 routes.append(route)
-                _endpoint_route_name_map[attr_value] = name
-                if route_info["index"]:
+                if attr_value.index:
                     index_route = route
 
         if index_route is None:
@@ -143,10 +165,6 @@ class ViewBase:
 
         self.router = Router(routes=routes)
         self.index_route = index_route
-        self._endpoint_route_name_map = _endpoint_route_name_map
-
-    def get_route_name(self, handler: Callable[..., Any]) -> str:
-        return self._endpoint_route_name_map[handler]
 
 
 class MissingModelViewModelError(ViewConfigurationError):
@@ -291,7 +309,7 @@ class ModelView(ViewBase, Generic[Model]):
         breadcrumbs: list[BreadcrumbItem] = [
             {
                 "label": self.title,
-                "url": request.url_for(self.get_route_name(self.list)),
+                "url": request.url_for(self.list.name),
                 "active": True,
             },
         ]
@@ -332,14 +350,12 @@ class ModelView(ViewBase, Generic[Model]):
         breadcrumbs: list[BreadcrumbItem] = [
             {
                 "label": self.title,
-                "url": request.url_for(self.get_route_name(self.list)),
+                "url": request.url_for(self.list.name),
                 "active": False,
             },
             {
                 "label": await self.get_item_title(request, item),
-                "url": request.url_for(
-                    self.get_route_name(self.edit), id=self.model_id_getter(item)
-                ),
+                "url": request.url_for(self.edit.name, id=self.model_id_getter(item)),
                 "active": True,
             },
         ]
@@ -372,7 +388,7 @@ class ModelView(ViewBase, Generic[Model]):
             {**request.query_params, "offset": next_offset}
         )
         next_route = (
-            f"{request.url_for(current_route)}?{next_query_params}"
+            f"{request.url_for(current_route.name)}?{next_query_params}"
             if next_offset < total
             else None
         )
@@ -382,7 +398,7 @@ class ModelView(ViewBase, Generic[Model]):
             {**request.query_params, "offset": previous_offset}
         )
         previous_route = (
-            f"{request.url_for(current_route)}?{previous_query_params}"
+            f"{request.url_for(current_route.name)}?{previous_query_params}"
             if previous_offset >= 0
             else None
         )
@@ -444,7 +460,7 @@ class ModelView(ViewBase, Generic[Model]):
             query_params = urllib.parse.urlencode(
                 {**request.query_params, "sorting": ",".join(sorting_param)}
             )
-            return f"{request.url_for(current_route)}?{query_params}"
+            return f"{request.url_for(current_route.name)}?{query_params}"
 
         return {"fields": fields, "get_sorting_route": get_sorting_route}
 

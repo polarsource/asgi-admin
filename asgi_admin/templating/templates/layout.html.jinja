@@ -29,7 +29,7 @@
         {% for item in _asgi_admin_navigation %}
           <li>
             <a
-              class="{{ 'is-active' if request.scope.endpoint.__self__ == item.view else '' }}"
+              class="{{ 'is-active' if _asgi_admin_current_route.view == item.view else '' }}"
               href="{{ url_for(item.index_route) }}"
               >{{ item.title }}</a
             >

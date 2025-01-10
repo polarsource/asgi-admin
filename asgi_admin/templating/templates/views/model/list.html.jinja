@@ -44,7 +44,16 @@
       {% for item in items %}
         <tr>
           {% for field in view.list_fields %}
-            <td>{{ item[field] }}</td>
+            <td>
+              {% if loop.first %}
+                <a
+                  href="{{ request.url_for(view.edit.name, id=view.model_id_getter(item)) }}"
+                  >{{ item[field] }}</a
+                >
+              {% else %}
+                {{ item[field] }}
+              {% endif %}
+            </td>
           {% endfor %}
         </tr>
       {% endfor %}
