@@ -1,9 +1,18 @@
 {% extends "layout.html.jinja" %}
 
 {% block container %}
-<section class="section">
-  <h1 class="title">{{ page_title }}</h1>
+  <section class="section">
+    <nav class="breadcrumb" aria-label="breadcrumbs">
+      <ul>
+        {% for breadcrumb in breadcrumbs %}
+          <li class="{{ 'is-active' if breadcrumb.active else '' }}">
+            <a href="{{ breadcrumb.url }}">{{ breadcrumb.label }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+    <h1 class="title">{{ page_title }}</h1>
 
-  {% block content %}{% endblock %}
-</section>
+    {% block content %}{% endblock %}
+  </section>
 {% endblock %}

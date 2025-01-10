@@ -12,12 +12,14 @@ from typing import (
     Any,
     ClassVar,
     Generic,
+    Protocol,
     TypedDict,
     TypeVar,
     Union,
 )
 
 import wtforms
+from starlette.datastructures import URL
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, Router
@@ -104,6 +106,8 @@ class ViewBase:
     router: Router
     index_route: Route
 
+    _endpoint_route_name_map: dict[Callable[..., Any], str]
+
     def __init_subclass__(cls, **kwargs) -> None:
         if cls.__name__ != "ModelView":
             if not hasattr(cls, "title"):
@@ -114,6 +118,7 @@ class ViewBase:
 
     def __init__(self) -> None:
         routes: list[Route] = []
+        _endpoint_route_name_map: dict[RouteType, str] = {}
         for attr_name in dir(self):
             attr_value = getattr(self, attr_name)
             if hasattr(attr_value, "_route_info"):
@@ -129,6 +134,7 @@ class ViewBase:
                     name=name,
                 )
                 routes.append(route)
+                _endpoint_route_name_map[attr_value] = name
                 if route_info["index"]:
                     index_route = route
 
@@ -137,6 +143,10 @@ class ViewBase:
 
         self.router = Router(routes=routes)
         self.index_route = index_route
+        self._endpoint_route_name_map = _endpoint_route_name_map
+
+    def get_route_name(self, handler: Callable[..., Any]) -> str:
+        return self._endpoint_route_name_map[handler]
 
 
 class MissingModelViewModelError(ViewConfigurationError):
@@ -150,6 +160,21 @@ class MissingModelViewModelError(ViewConfigurationError):
     def __init__(self, cls: type["ModelView"]) -> None:
         super().__init__(
             f"The `model` attribute must be set on the model view class {cls.__name__}",
+            cls,
+        )
+
+
+class MissingModelViewModelIdGetterError(ViewConfigurationError):
+    """
+    Raised when a model view is missing a model id getter.
+
+    Parameters:
+        cls: The model view class.
+    """
+
+    def __init__(self, cls: type["ModelView"]) -> None:
+        super().__init__(
+            f"The `model_id_getter` attribute must be set on the model view class {cls.__name__}",
             cls,
         )
 
@@ -194,8 +219,19 @@ class SortingOutput(TypedDict):
     get_sorting_route: Callable[[str], str]
 
 
+class BreadcrumbItem(TypedDict):
+    label: str
+    url: Union[str, URL]
+    active: bool
+
+
+class ModelIDGetterProtocol(Protocol[Model]):  # type: ignore
+    def __call__(self, item: Model, /) -> Any: ...
+
+
 class ModelView(ViewBase, Generic[Model]):
     model: ClassVar[type[Any]]
+    model_id_getter: ClassVar[ModelIDGetterProtocol[Any]]
     field_labels: ClassVar[dict[str, str]] = {}
 
     list_default_limit: ClassVar[int] = 10
@@ -209,6 +245,8 @@ class ModelView(ViewBase, Generic[Model]):
     def __init_subclass__(cls, **kwargs):
         if not hasattr(cls, "model"):
             raise MissingModelViewModelError(cls)
+        if not hasattr(cls, "model_id_getter"):
+            raise MissingModelViewModelIdGetterError(cls)
         if not hasattr(cls, "list_fields"):
             raise MissingModelViewListFieldsError(cls)
         if not hasattr(cls, "title"):
@@ -249,11 +287,20 @@ class ModelView(ViewBase, Generic[Model]):
             total, items = await repository.list(
                 sorting, offset, limit, query=query, query_fields=self.list_query_fields
             )
+
+        breadcrumbs: list[BreadcrumbItem] = [
+            {
+                "label": self.title,
+                "url": request.url_for(self.get_route_name(self.list)),
+                "active": True,
+            },
+        ]
         return templates.TemplateResponse(
             request,
             "views/model/list.html.jinja",
             {
                 "page_title": self.title,
+                "breadcrumbs": breadcrumbs,
                 "view": self,
                 "items": items,
                 "pagination": self._get_pagination_output(
@@ -282,11 +329,26 @@ class ModelView(ViewBase, Generic[Model]):
                 else:
                     status_code = 400
 
+        breadcrumbs: list[BreadcrumbItem] = [
+            {
+                "label": self.title,
+                "url": request.url_for(self.get_route_name(self.list)),
+                "active": False,
+            },
+            {
+                "label": await self.get_item_title(request, item),
+                "url": request.url_for(
+                    self.get_route_name(self.edit), id=self.model_id_getter(item)
+                ),
+                "active": True,
+            },
+        ]
         return templates.TemplateResponse(
             request,
             "views/model/edit.html.jinja",
             {
                 "page_title": await self.get_item_title(request, item),
+                "breadcrumbs": breadcrumbs,
                 "view": self,
                 "item": item,
                 "form": form,

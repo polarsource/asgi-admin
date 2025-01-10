@@ -1,0 +1,9 @@
+{
+    "folders": [{
+        "path": "."
+    }],
+	"settings": {
+    // Use our own version of mypy, to avoid cache conflicts between the extension version and our own version
+		"mypy-type-checker.importStrategy": "fromEnvironment",
+	}
+}

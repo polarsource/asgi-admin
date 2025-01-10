@@ -1,3 +1,5 @@
+from operator import attrgetter
+
 import httpx
 import pytest
 from bs4 import BeautifulSoup
@@ -5,6 +7,7 @@ from bs4 import BeautifulSoup
 from asgi_admin.views import (
     MissingModelViewListFieldsError,
     MissingModelViewModelError,
+    MissingModelViewModelIdGetterError,
     MissingViewPrefixError,
     MissingViewTitleError,
     ModelView,
@@ -36,11 +39,18 @@ class TestModelViewConfigurationError:
 
             class MyModelView(ModelView): ...
 
+    def test_missing_model_id_getter(self) -> None:
+        with pytest.raises(MissingModelViewModelIdGetterError):
+
+            class MyModelView(ModelView):
+                model = MyModel
+
     def test_missing_list_fields(self) -> None:
         with pytest.raises(MissingModelViewListFieldsError):
 
             class MyModelView(ModelView):
                 model = MyModel
+                model_id_getter = attrgetter("id")
 
 
 @pytest.mark.asyncio

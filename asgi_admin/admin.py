@@ -22,6 +22,7 @@ class AdminStateMiddleware:
                 {
                     "title": view.title,
                     "index_route": view.index_route.name,
+                    "view": view,
                 }
                 for view in self.admin.views
             ]

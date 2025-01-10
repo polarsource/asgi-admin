@@ -1,9 +1,7 @@
-from collections.abc import Callable
 from typing import Any, Union
 
 from jinja2 import Environment, PackageLoader, select_autoescape
 from starlette.requests import Request
-from starlette.routing import Route
 from starlette.templating import Jinja2Templates
 
 from .._constants import (
@@ -26,17 +24,6 @@ def state_context(request: Request) -> dict[str, Any]:
         CONTEXT_NAVIGATION_KEY: getattr(request.state, SCOPE_NAVIGATION_KEY),
         CONTEXT_TITLE_KEY: getattr(request.state, SCOPE_TITLE_KEY),
     }
-
-
-def _current_route(
-    routes: list[Route], endpoint: Callable[..., Any]
-) -> Union[str, None]:
-    for route in routes:
-        if getattr(route, "endpoint", None) == endpoint:
-            return route.name
-        if sub_route := getattr(route, "routes", None):
-            return _current_route(sub_route, endpoint)
-    return None
 
 
 def current_route_context(request: Request) -> dict[str, Union[str, None]]:

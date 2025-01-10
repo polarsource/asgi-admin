@@ -75,6 +75,7 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
 
 class MyModelView(ModelView[MyModel]):
     model = MyModel
+    model_id_getter = attrgetter("id")
     field_labels = {"id": "ID", "label": "Label", "created_at": "Created At"}
 
     list_fields = ("id", "label", "created_at")

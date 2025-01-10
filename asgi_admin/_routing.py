@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, Union, cast
+from typing import Any, cast
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -17,9 +17,7 @@ class CurrentRouteNotFound(ASGIAdminError):
         super().__init__("Current route not found.")
 
 
-def _get_current_route(
-    routes: list[Route], endpoint: Callable[..., Any]
-) -> Union[str, None]:
+def _get_current_route(routes: list[Route], endpoint: Callable[..., Any]) -> str:
     for route in routes:
         if getattr(route, "endpoint", None) == endpoint:
             return route.name
@@ -28,7 +26,7 @@ def _get_current_route(
     raise CurrentRouteNotFound()  # pragma: no cover
 
 
-def get_current_route(request: Request) -> Union[str, None]:
+def get_current_route(request: Request) -> str:
     app: Starlette = request.scope["app"]
     endpoint: Callable[..., Any] = request.scope["endpoint"]
     routes: list[Route] = cast(list[Route], app.routes)

@@ -4,7 +4,7 @@
 {% block content %}
   <form
     method="POST"
-    action="{{ url_for(_asgi_admin_current_route, id=item.id) }}"
+    action="{{ url_for(_asgi_admin_current_route, id=view.model_id_getter(item)) }}"
   >
     {% for field in form %}
       {{ forms.form_field(field) }}
