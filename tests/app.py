@@ -77,11 +77,11 @@ async def get_my_model_repository(request: Request) -> AsyncIterator[MyModelRepo
 
 
 my_model_viewset = ModelViewSet[MyModel](
-    name="my_model",
+    name="my-model",
     title="My Model",
     get_repository=get_my_model_repository,
     pk_getter=attrgetter("id"),
-    item_title_getter=lambda _, i: i.label,
+    item_title_getter=attrgetter("label"),
     list_fields=(
         ("id", "ID"),
         ("label", "Label"),
@@ -100,11 +100,8 @@ my_model_viewset = ModelViewSet[MyModel](
     ),
 )
 
-admin = AdminViewSet(
-    viewsets={
-        "/my-model": my_model_viewset,
-    }
-)
+admin = AdminViewSet()
+admin.add_viewset(my_model_viewset)
 
 
 app = Starlette()

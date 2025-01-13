@@ -356,7 +356,7 @@ class ModelViewEdit(ModelView[Model]):
 
     async def get_title(self, request: Request) -> str:
         item: Model = request.state.item
-        return await self.viewset.item_title_getter(request, item)
+        return self.viewset.item_title_getter(item)
 
 
 class AdminIndexView(ViewBase):

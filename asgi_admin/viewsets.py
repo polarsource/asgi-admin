@@ -3,9 +3,7 @@ import functools
 import inspect
 from collections.abc import (
     AsyncIterator,
-    Awaitable,
     Callable,
-    Coroutine,
     Iterable,
     Sequence,
 )
@@ -19,7 +17,6 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from asgi_admin._constants import ROUTE_NAME_SEPARATOR, SCOPE_NAVIGATION_KEY
 
-from ._asyncio import wrap_to_async
 from ._breadcrumbs import BreadcrumbItem
 from .repository import Model, RepositoryProtocol
 from .views import AdminIndexView, ModelViewEdit, ModelViewList, ViewBase
@@ -86,8 +83,9 @@ class ViewSet:
             return None
         return self.get_view(self.index_view_name)
 
-    def add_viewset(self, viewset: "ViewSet", prefix: str) -> None:
+    def add_viewset(self, viewset: "ViewSet", prefix: Union[str, None] = None) -> None:
         viewset.parent_viewset = self
+        prefix = prefix or f"/{viewset.name}"
         self.viewsets[prefix] = viewset
 
     def is_nested(self, viewset: "ViewSet") -> bool:
@@ -120,7 +118,7 @@ class ModelViewSet(Generic[Model], ViewSet):
         [Request], contextlib.AbstractAsyncContextManager[RepositoryProtocol[Model]]
     ]
     pk_getter: Callable[[Model], Any]
-    item_title_getter: Callable[[Request, Model], Coroutine[Any, Any, str]]
+    item_title_getter: Callable[[Model], str]
 
     def __init__(
         self,
@@ -134,10 +132,7 @@ class ModelViewSet(Generic[Model], ViewSet):
             ],
         ],
         pk_getter: Callable[[Model], Any],
-        item_title_getter: Union[
-            Callable[[Request, Model], Awaitable[str]],
-            Callable[[Request, Model], str],
-        ],
+        item_title_getter: Callable[[Model], str],
         list_fields: Sequence[Union[str, tuple[str, str]]],
         list_sortable_fields: Union[Iterable[str], None] = None,
         list_query_fields: Union[Iterable[str], None] = None,
@@ -153,12 +148,8 @@ class ModelViewSet(Generic[Model], ViewSet):
         else:
             self.get_repository = get_repository  # type: ignore
 
-        if inspect.iscoroutinefunction(item_title_getter):
-            self.item_title_getter = item_title_getter
-        else:
-            self.item_title_getter = wrap_to_async(item_title_getter)  # type: ignore
-
         self.pk_getter = pk_getter
+        self.item_title_getter = item_title_getter
 
         views = [] if views is None else list(views)
         views = [
