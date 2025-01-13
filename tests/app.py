@@ -8,9 +8,8 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from wtforms import StringField, validators
 
-from asgi_admin.admin import AdminBase
 from asgi_admin.repository import RepositoryProtocol, Sorting, SortingOrder
-from asgi_admin.views import ModelView
+from asgi_admin.viewsets import AdminViewSet, ModelViewSet
 
 
 @dataclasses.dataclass
@@ -73,15 +72,23 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
         return item
 
 
-class MyModelView(ModelView[MyModel]):
-    model = MyModel
-    model_id_getter = attrgetter("id")
-    field_labels = {"id": "ID", "label": "Label", "created_at": "Created At"}
+async def get_my_model_repository(request: Request) -> AsyncIterator[MyModelRepository]:
+    yield MyModelRepository()
 
-    list_fields = ("id", "label", "created_at")
-    list_query_fields = ("id", "label")
 
-    edit_fields = (
+my_model_viewset = ModelViewSet[MyModel](
+    name="my_model",
+    title="My Model",
+    get_repository=get_my_model_repository,
+    pk_getter=attrgetter("id"),
+    item_title_getter=lambda _, i: i.label,
+    list_fields=(
+        ("id", "ID"),
+        ("label", "Label"),
+        ("created_at", "Created At"),
+    ),
+    list_query_fields=("id", "label"),
+    edit_fields=(
         (
             "label",
             StringField(
@@ -90,20 +97,15 @@ class MyModelView(ModelView[MyModel]):
                 validators=[validators.InputRequired(), validators.Length(min=3)],
             ),
         ),
-    )
+    ),
+)
 
-    async def get_repository(
-        self, request: Request
-    ) -> AsyncIterator[MyModelRepository]:
-        yield MyModelRepository()
-
-    async def get_item_title(self, request: Request, item: MyModel) -> str:
-        return item.label
-
-
-class MyAdmin(AdminBase):
-    views = [MyModelView()]
+admin = AdminViewSet(
+    viewsets={
+        "/my-model": my_model_viewset,
+    }
+)
 
 
 app = Starlette()
-app.mount("/admin", MyAdmin())
+app.mount("/admin", admin.router)

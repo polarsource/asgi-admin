@@ -6,12 +6,12 @@
   <div class="level">
     <div class="level-left"></div>
     <div class="level-right">
-      {% if view.list_query_fields %}
+      {% if view.query_fields %}
         <form action method="GET">
           <input
             class="input"
             type="text"
-            placeholder="Filter by {{ view.list_query_fields | join(', ') }}"
+            placeholder="Filter by {{ view.query_fields | map('keygetter', view.fields) | join(', ') }}"
             name="query"
             value="{{ query or '' }}"
           />
@@ -22,12 +22,12 @@
   <table class="is-fullwidth is-hoverable is-bordered table">
     <thead>
       <tr>
-        {% for field in view.list_fields %}
+        {% for field in view.fields %}
           <th>
-            {% if field in view.list_sortable_fields %}
+            {% if field in view.sortable_fields %}
               <a class="" href="{{ sorting.get_sorting_route(field) }}">
                 <span class="icon-text">
-                  {{ view.field_labels[field] or field }}
+                  {{ view.fields[field] }}
                   {% if sorting.fields[field] %}
                     {% if sorting.fields[field] == "ASC" %}
                       {{ icons.arrow_long_down("icon is-small") }}
@@ -40,7 +40,7 @@
                 </span>
               </a>
             {% else %}
-              {{ view.field_labels[field] or field }}
+              {{ view.fields[field] }}
             {% endif %}
           </th>
         {% endfor %}
@@ -49,12 +49,12 @@
     <tbody>
       {% for item in items %}
         <tr>
-          {% for field in view.list_fields %}
+          {% for field in view.fields %}
             <td>
               <div class="is-flex is-justify-content-space-between">
                 {% if loop.first %}
                   <a
-                    href="{{ request.url_for(view.edit.name, id=view.model_id_getter(item)) }}"
+                    href="{{ request.url_for(view.viewset.get_view('edit').route_name, pk=view.viewset.pk_getter(item)) }}"
                     >{{ item[field] }}</a
                   >
                 {% else %}

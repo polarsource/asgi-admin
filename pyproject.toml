@@ -9,6 +9,11 @@ addopts = "--cov=asgi_admin/ --cov-report=term-missing"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "strict"
 
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+]
+
 [tool.hatch]
 
 [tool.hatch.metadata]

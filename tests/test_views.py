@@ -1,18 +1,8 @@
-from operator import attrgetter
-
 import httpx
 import pytest
 from bs4 import BeautifulSoup
 
-from asgi_admin.views import (
-    MissingModelViewListFieldsError,
-    MissingModelViewModelError,
-    MissingModelViewModelIdGetterError,
-    MissingViewPrefixError,
-    MissingViewTitleError,
-    ModelView,
-    ViewBase,
-)
+from asgi_admin.views import ModelViewList, NotTiedToModelViewSetError
 
 from .app import ITEMS, MyModel
 
@@ -20,41 +10,15 @@ FIRST_ITEM_ID = list(ITEMS.keys())[0]
 FIRST_ITEM = ITEMS[FIRST_ITEM_ID]
 
 
-class TestBaseViewConfigurationError:
-    def test_missing_title(self) -> None:
-        with pytest.raises(MissingViewTitleError):
-
-            class MyView(ViewBase): ...
-
-    def test_missing_prefix(self) -> None:
-        with pytest.raises(MissingViewPrefixError):
-
-            class MyView(ViewBase):
-                title = "My View"
-
-
-class TestModelViewConfigurationError:
-    def test_missing_model(self) -> None:
-        with pytest.raises(MissingModelViewModelError):
-
-            class MyModelView(ModelView): ...
-
-    def test_missing_model_id_getter(self) -> None:
-        with pytest.raises(MissingModelViewModelIdGetterError):
-
-            class MyModelView(ModelView):
-                model = MyModel
-
-    def test_missing_list_fields(self) -> None:
-        with pytest.raises(MissingModelViewListFieldsError):
-
-            class MyModelView(ModelView):
-                model = MyModel
-                model_id_getter = attrgetter("id")
-
-
 @pytest.mark.asyncio
 class TestModelViewList:
+    async def test_orphan_view(self) -> None:
+        with pytest.raises(NotTiedToModelViewSetError):
+            view = ModelViewList[MyModel](
+                title="My Model", fields=["id", "label"], path="/", name="list"
+            )
+            view.viewset
+
     async def test_basic(self, client: httpx.AsyncClient) -> None:
         response = await client.get("/admin/my-model/")
         assert response.status_code == 200
@@ -62,6 +26,18 @@ class TestModelViewList:
         parsed = BeautifulSoup(response.text, "html.parser")
         tbody_tr_items = parsed.find_all("tbody")[0].find_all("tr")
         assert len(tbody_tr_items) == len(ITEMS)
+
+    async def test_pagination(self, client: httpx.AsyncClient) -> None:
+        response = await client.get(
+            "/admin/my-model/", params={"limit": 3, "offset": 3}
+        )
+        assert response.status_code == 200
+
+        parsed = BeautifulSoup(response.text, "html.parser")
+        tbody_tr_items = parsed.find_all("tbody")[0].find_all("tr")
+        assert len(tbody_tr_items) == 3
+        td_id = tbody_tr_items[0].find_all("td")[0]
+        assert td_id.text.strip() == ITEMS[list(ITEMS.keys())[3]].id
 
     async def test_sorting(self, client: httpx.AsyncClient) -> None:
         response = await client.get("/admin/my-model/", params={"sorting": "-label"})

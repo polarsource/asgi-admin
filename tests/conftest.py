@@ -6,19 +6,13 @@ import pytest_asyncio
 from asgi_lifespan import LifespanManager
 from starlette.applications import Starlette
 
-from asgi_admin.admin import AdminBase
-
-from .app import MyModelView
-
-
-class MyAdmin(AdminBase):
-    views = [MyModelView()]
+from .app import admin
 
 
 @pytest.fixture
 def app() -> Starlette:
     app = Starlette()
-    app.mount("/admin", MyAdmin())
+    app.mount("/admin", admin.router)
     return app
 
 

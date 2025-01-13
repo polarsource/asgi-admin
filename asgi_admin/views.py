@@ -1,226 +1,123 @@
-import contextlib
 import functools
-import secrets
-import urllib
 import urllib.parse
-from collections.abc import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Iterable,
-    Sequence,
-)
-from typing import (
-    Any,
-    ClassVar,
-    Generic,
-    Protocol,
-    TypedDict,
-    TypeVar,
-    Union,
-)
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Callable, Generic, TypedDict, Union
 
 import wtforms
-from starlette.datastructures import URL
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.routing import Route, Router
+from starlette.routing import Route, request_response
+from starlette.types import Receive, Scope, Send
 
-from ._constants import ROUTE_NAME_PREFIX
-from ._normalization import class_name_to_url_path
-from ._routing import RouteView, get_current_route
+from asgi_admin._constants import ROUTE_NAME_SEPARATOR
+
+from ._breadcrumbs import BreadcrumbItem
 from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
-from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
+from .repository import Model, Sorting, SortingOrder
 from .templating import templates
 
-ViewType = TypeVar("ViewType", bound="ViewBase")
-RouteType = Callable[[ViewType, Request], Awaitable[Response]]
+if TYPE_CHECKING:
+    from .viewsets import ModelViewSet, ViewSet
 
 
-class _DecoratedRoute:
-    handler: RouteType
-    path: str
-    methods: list[str]
-    name: str
-    index: bool
-
-    def __init__(
-        self,
-        handler: RouteType,
-        path: str,
-        methods: list[str],
-        *,
-        name: Union[str, None] = None,
-        index: bool = False,
-    ) -> None:
-        self.handler = handler
-        self.path = path
-        self.methods = methods
-        if name is None:
-            name = (
-                f"{ROUTE_NAME_PREFIX}{self.handler.__name__}.{secrets.token_urlsafe(4)}"
-            )
-        self.name = name
-        self.index = index
-
-        self.__call__ = self.handler
-
-
-def route(
-    path: str,
-    methods: list[str],
-    *,
-    name: Union[str, None] = None,
-    index: bool = False,
-) -> Callable[[RouteType], _DecoratedRoute]:
-    def decorator(func: RouteType) -> _DecoratedRoute:
-        return _DecoratedRoute(func, path, methods, name=name, index=index)
-
-    return decorator
-
-
-class ViewConfigurationError(ASGIAdminConfigurationError):
+class ViewConfigurationError(TypeError, ASGIAdminConfigurationError):
     """
     Raised when a view is not correctly configured.
 
     Parameters:
         message: The error message.
-        cls: The view class.
     """
 
-    def __init__(
-        self,
-        message: str,
-        cls: type["ViewBase"],
-    ) -> None:
-        self.cls = cls
+    def __init__(self, message: str) -> None:
         super().__init__(message)
-
-
-class MissingViewTitleError(ViewConfigurationError):
-    """
-    Raised when a view is missing a title.
-
-    Parameters:
-        cls: The view class.
-    """
-
-    def __init__(self, cls: type["ViewBase"]) -> None:
-        super().__init__(
-            f"The `title` attribute must be set on the view class {cls.__name__}", cls
-        )
-
-
-class MissingViewPrefixError(ViewConfigurationError):
-    """
-    Raised when a view is missing a prefix.
-
-    Parameters:
-        cls: The view class.
-    """
-
-    def __init__(self, cls: type["ViewBase"]) -> None:
-        super().__init__(
-            f"The `prefix` attribute must be set on the view class {cls.__name__}", cls
-        )
+        super(ASGIAdminConfigurationError, self).__init__(message)
 
 
 class ViewBase:
-    title: ClassVar[str]
-    prefix: ClassVar[str]
-    router: Router
-    index_route: Route
+    path: str
+    methods: Iterable[str]
+    name: str
+    title: str
+    _viewset: Union["ViewSet", None] = None
 
-    def __init_subclass__(cls, **kwargs) -> None:
-        if cls.__name__ != "ModelView":
-            if not hasattr(cls, "title"):
-                raise MissingViewTitleError(cls)
-            if not hasattr(cls, "prefix"):
-                raise MissingViewPrefixError(cls)
-        super().__init_subclass__(**kwargs)
+    def __init__(
+        self,
+        path: str,
+        name: str,
+        methods: Iterable[str] = ["GET"],
+        *,
+        title: Union[str, None] = None,
+    ):
+        self.path = path
+        self.name = name
+        self.methods = methods or self.methods
+        self.title = title or self.name
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        return await request_response(self.handle)(scope, receive, send)
+
+    async def handle(self, request: Request) -> Response:
+        raise NotImplementedError()  # pragma: no cover
+
+    @functools.cached_property
+    def route_name(self) -> str:
+        if self.viewset is None:
+            return self.name
+        return f"{self.viewset.route_name}{ROUTE_NAME_SEPARATOR}{self.name}"
+
+    @functools.cached_property
+    def route(self) -> Route:
+        return Route(self.path, self, methods=list(self.methods), name=self.route_name)
+
+    @property
+    def viewset(self) -> Union["ViewSet", None]:
+        return self._viewset
+
+    @viewset.setter
+    def viewset(self, viewset: "ViewSet") -> None:
+        self._viewset = viewset
+
+    async def get_title(self, request: Request) -> str:
+        return self.title
+
+    def is_nested(self, viewset: "ViewSet") -> bool:
+        if self.viewset is None:
+            return False
+        if self.viewset == viewset:
+            return True
+        return self.viewset.is_nested(viewset)
+
+    async def get_breadcrumbs(self, request: Request) -> list[BreadcrumbItem]:
+        breadcrumbs: list[BreadcrumbItem] = []
+        if self.viewset is not None:
+            breadcrumbs.extend(self.viewset.get_breadcrumbs(request))
+
+        title = await self.get_title(request)
+        breadcrumbs.append({"label": title, "url": request.url, "active": True})
+        return breadcrumbs
+
+
+class NotTiedToModelViewSetError(ViewConfigurationError):
+    """
+    Raised when a model view is not tied to a ModelViewSet.
+    """
 
     def __init__(self) -> None:
-        routes: list[Route] = []
-        for attr_name in dir(self):
-            attr_value = getattr(self, attr_name)
-            if isinstance(attr_value, _DecoratedRoute):
-                name = (
-                    attr_value.name
-                    or f"{ROUTE_NAME_PREFIX}{self.__class__.__name__}.{attr_name}"
-                )
-                handler = functools.partial(attr_value.handler, self)
-                route = RouteView(
-                    attr_value.path,
-                    handler,
-                    self,
-                    methods=attr_value.methods,
-                    name=name,
-                )
-                routes.append(route)
-                if attr_value.index:
-                    index_route = route
-
-        if index_route is None:
-            index_route = routes[0]
-
-        self.router = Router(routes=routes)
-        self.index_route = index_route
+        super().__init__("View is not tied to a ModelViewSet.")
 
 
-class MissingModelViewModelError(ViewConfigurationError):
-    """
-    Raised when a model view is missing a model.
+class ModelView(Generic[Model], ViewBase):
+    _viewset: "Union[ModelViewSet[Model], None]" = None
 
-    Parameters:
-        cls: The model view class.
-    """
+    @property
+    def viewset(self) -> "ModelViewSet[Model]":
+        if self._viewset is None:
+            raise NotTiedToModelViewSetError()
+        return self._viewset
 
-    def __init__(self, cls: type["ModelView"]) -> None:
-        super().__init__(
-            f"The `model` attribute must be set on the model view class {cls.__name__}",
-            cls,
-        )
-
-
-class MissingModelViewModelIdGetterError(ViewConfigurationError):
-    """
-    Raised when a model view is missing a model id getter.
-
-    Parameters:
-        cls: The model view class.
-    """
-
-    def __init__(self, cls: type["ModelView"]) -> None:
-        super().__init__(
-            f"The `model_id_getter` attribute must be set on the model view class {cls.__name__}",
-            cls,
-        )
-
-
-class MissingModelViewListFieldsError(ViewConfigurationError):
-    """
-    Raised when a model view is missing a list of fields.
-
-    Parameters:
-        cls: The model view class.
-    """
-
-    def __init__(self, cls: type["ModelView"]) -> None:
-        super().__init__(
-            f"The `list_fields` attribute must be set on the model view class {cls.__name__}",
-            cls,
-        )
-
-
-def _build_form_class(
-    fields: Sequence[tuple[str, wtforms.Field]],
-) -> type[wtforms.Form]:
-    class Form(wtforms.Form):
-        pass
-
-    for field_name, field in fields:
-        setattr(Form, field_name, field)
-    return Form
+    @viewset.setter
+    def viewset(self, viewset: "ModelViewSet[Model]") -> None:
+        self._viewset = viewset
 
 
 class PaginationOutput(TypedDict):
@@ -237,88 +134,52 @@ class SortingOutput(TypedDict):
     get_sorting_route: Callable[[str], str]
 
 
-class BreadcrumbItem(TypedDict):
-    label: str
-    url: Union[str, URL]
-    active: bool
+class ModelViewList(ModelView[Model]):
+    default_limit: int
+    fields: dict[str, str]
+    sortable_fields: Iterable[str]
+    query_fields: Iterable[str]
 
+    def __init__(
+        self,
+        *,
+        title: str,
+        default_limit: int = 10,
+        fields: Sequence[Union[str, tuple[str, str]]],
+        sortable_fields: Union[Iterable[str], None] = None,
+        query_fields: Union[Iterable[str], None] = None,
+        path: str,
+        name: str,
+    ) -> None:
+        self.default_limit = default_limit
 
-class ModelIDGetterProtocol(Protocol[Model]):  # type: ignore
-    def __call__(self, item: Model, /) -> Any: ...
+        self.fields: dict[str, str] = {}
+        for field in fields:
+            if isinstance(field, str):
+                self.fields[field] = field
+            else:
+                self.fields[field[0]] = field[1]
 
+        self.sortable_fields = sortable_fields or list(self.fields.keys())
+        self.query_fields = query_fields or ()
+        super().__init__(path=path, name=name, methods=["GET"], title=title)
 
-class ModelView(ViewBase, Generic[Model]):
-    model: ClassVar[type[Any]]
-    model_id_getter: ClassVar[ModelIDGetterProtocol[Any]]
-    field_labels: ClassVar[dict[str, str]] = {}
-
-    list_default_limit: ClassVar[int] = 10
-    list_fields: ClassVar[Sequence[str]]
-    list_sortable_fields: ClassVar[Iterable[str]]
-    list_query_fields: ClassVar[Iterable[str]] = ()
-
-    edit_fields: ClassVar[Sequence[tuple[str, wtforms.Field]]] = ()
-    edit_form_class: ClassVar[type[wtforms.Form]]
-
-    def __init_subclass__(cls, **kwargs):
-        if not hasattr(cls, "model"):
-            raise MissingModelViewModelError(cls)
-        if not hasattr(cls, "model_id_getter"):
-            raise MissingModelViewModelIdGetterError(cls)
-        if not hasattr(cls, "list_fields"):
-            raise MissingModelViewListFieldsError(cls)
-        if not hasattr(cls, "title"):
-            cls.title = cls.model.__name__
-        if not hasattr(cls, "prefix"):
-            cls.prefix = f"/{class_name_to_url_path(cls.model.__name__)}"
-        if not hasattr(cls, "list_sortable_fields"):
-            cls.list_sortable_fields = cls.list_fields
-        if not hasattr(cls, "edit_form_class"):
-            cls.edit_form_class = _build_form_class(cls.edit_fields)
-        super().__init_subclass__(**kwargs)
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._get_repository_context = contextlib.asynccontextmanager(
-            self.get_repository
-        )
-
-    async def get_repository(
-        self, request: Request
-    ) -> AsyncIterator[RepositoryProtocol[Model]]:  # pragma: no cover
-        raise NotImplementedError()
-        # Trick to make mypy happy about this method being an async iterator
-        # Ref: https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
-        if False:
-            yield
-
-    async def get_item_title(self, request: Request, item: Model) -> str:
-        return str(item)
-
-    @route("/", methods=["GET"], index=True)
-    async def list(self, request: Request) -> Response:
+    async def handle(self, request: Request) -> Response:
         offset, limit = self._get_pagination_input(request)
         sorting = self._get_sorting_input(request)
         query = await self._get_query_input(request)
 
-        async with self._get_repository_context(request) as repository:
+        async with self.viewset.get_repository(request) as repository:
             total, items = await repository.list(
-                sorting, offset, limit, query=query, query_fields=self.list_query_fields
+                sorting, offset, limit, query=query, query_fields=self.query_fields
             )
 
-        breadcrumbs: list[BreadcrumbItem] = [
-            {
-                "label": self.title,
-                "url": request.url_for(self.list.name),
-                "active": True,
-            },
-        ]
         return templates.TemplateResponse(
             request,
             "views/model/list.html.jinja",
             {
-                "page_title": self.title,
-                "breadcrumbs": breadcrumbs,
+                "page_title": await self.get_title(request),
+                "breadcrumbs": await self.get_breadcrumbs(request),
                 "view": self,
                 "items": items,
                 "pagination": self._get_pagination_output(
@@ -329,66 +190,20 @@ class ModelView(ViewBase, Generic[Model]):
             },
         )
 
-    @route("/{id}", methods=["GET", "POST"])
-    async def edit(self, request: Request) -> Response:
-        async with self._get_repository_context(request) as repository:
-            item = await repository.get_by_id(request.path_params["id"])
-            if item is None:
-                raise ASGIAdminNotFound()
-
-            form_data = await request.form()
-            form = self.edit_form_class(form_data, obj=item)
-
-            status_code = 200
-            if request.method == "POST":
-                if form.validate():
-                    item = await repository.update(item, form.data)
-                    # TODO: Success message
-                else:
-                    status_code = 400
-
-        breadcrumbs: list[BreadcrumbItem] = [
-            {
-                "label": self.title,
-                "url": request.url_for(self.list.name),
-                "active": False,
-            },
-            {
-                "label": await self.get_item_title(request, item),
-                "url": request.url_for(self.edit.name, id=self.model_id_getter(item)),
-                "active": True,
-            },
-        ]
-        return templates.TemplateResponse(
-            request,
-            "views/model/edit.html.jinja",
-            {
-                "page_title": await self.get_item_title(request, item),
-                "breadcrumbs": breadcrumbs,
-                "view": self,
-                "item": item,
-                "form": form,
-            },
-            status_code=status_code,
-        )
-
     def _get_pagination_input(self, request: Request) -> tuple[int, int]:
         offset = int(request.query_params.get("offset", 0))
-        limit = int(request.query_params.get("limit", self.list_default_limit))
+        limit = int(request.query_params.get("limit", self.default_limit))
         return offset, limit
 
     def _get_pagination_output(
         self, request: Request, offset: int, limit: int, total: int
     ) -> PaginationOutput:
-        current_route = get_current_route(request)
-        assert current_route is not None
-
         next_offset = offset + limit
         next_query_params = urllib.parse.urlencode(
             {**request.query_params, "offset": next_offset}
         )
         next_route = (
-            f"{request.url_for(current_route.name)}?{next_query_params}"
+            f"{request.url_for(self.route_name)}?{next_query_params}"
             if next_offset < total
             else None
         )
@@ -398,7 +213,7 @@ class ModelView(ViewBase, Generic[Model]):
             {**request.query_params, "offset": previous_offset}
         )
         previous_route = (
-            f"{request.url_for(current_route.name)}?{previous_query_params}"
+            f"{request.url_for(self.route_name)}?{previous_query_params}"
             if previous_offset >= 0
             else None
         )
@@ -423,16 +238,13 @@ class ModelView(ViewBase, Generic[Model]):
             if field.startswith("-"):
                 order = SortingOrder.DESC
                 field = field[1:]
-            if field in self.list_sortable_fields:
+            if field in self.sortable_fields:
                 sorting.append((field, order))
         return sorting
 
     def _get_sorting_output(self, request: Request, sorting: Sorting) -> SortingOutput:
-        current_route = get_current_route(request)
-        assert current_route is not None
-
         fields: dict[str, Union[SortingOrder, None]] = {
-            field: None for field in self.list_sortable_fields
+            field: None for field in self.sortable_fields
         }
         for field, current_order in sorting:
             fields[field] = current_order
@@ -460,7 +272,7 @@ class ModelView(ViewBase, Generic[Model]):
             query_params = urllib.parse.urlencode(
                 {**request.query_params, "sorting": ",".join(sorting_param)}
             )
-            return f"{request.url_for(current_route.name)}?{query_params}"
+            return f"{request.url_for(self.route_name)}?{query_params}"
 
         return {"fields": fields, "get_sorting_route": get_sorting_route}
 
@@ -469,3 +281,97 @@ class ModelView(ViewBase, Generic[Model]):
         if query is not None:
             return query.strip()
         return None
+
+
+def _build_form_class(
+    fields: Sequence[tuple[str, wtforms.Field]],
+) -> type[wtforms.Form]:
+    class Form(wtforms.Form):
+        pass
+
+    for field_name, field in fields:
+        setattr(Form, field_name, field)
+    return Form
+
+
+class ModelViewEditFieldsConfigurationError(ViewConfigurationError):
+    """
+    Raised when both `edit_fields` and `edit_form_class` are not provided.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Either `edit_fields` or `edit_form_class` must be provided.")
+
+
+class ModelViewEdit(ModelView[Model]):
+    edit_fields: Sequence[tuple[str, wtforms.Field]]
+    edit_form_class: type[wtforms.Form]
+
+    def __init__(
+        self,
+        *,
+        edit_fields: Union[Sequence[tuple[str, wtforms.Field]], None] = None,
+        edit_form_class: Union[type[wtforms.Form], None] = None,
+        path: str,
+        name: str,
+    ) -> None:
+        if edit_form_class is not None:
+            self.edit_form_class = edit_form_class
+        elif edit_fields is not None:
+            self.edit_form_class = _build_form_class(edit_fields)
+        else:
+            raise ModelViewEditFieldsConfigurationError()
+        super().__init__(path=path, name=name, methods=["GET", "POST"])
+
+    async def handle(self, request: Request) -> Response:
+        async with self.viewset.get_repository(request) as repository:
+            item = await repository.get_by_id(request.path_params["pk"])
+            if item is None:
+                raise ASGIAdminNotFound()
+            request.state.item = item
+
+            form_data = await request.form()
+            form = self.edit_form_class(form_data, obj=item)
+
+            status_code = 200
+            if request.method == "POST":
+                if form.validate():
+                    item = await repository.update(item, form.data)
+                    # TODO: Success message
+                else:
+                    status_code = 400
+
+        return templates.TemplateResponse(
+            request,
+            "views/model/edit.html.jinja",
+            {
+                "page_title": await self.get_title(request),
+                "breadcrumbs": await self.get_breadcrumbs(request),
+                "view": self,
+                "item": item,
+                "form": form,
+            },
+            status_code=status_code,
+        )
+
+    async def get_title(self, request: Request) -> str:
+        item: Model = request.state.item
+        return await self.viewset.item_title_getter(request, item)
+
+
+class AdminIndexView(ViewBase):
+    def __init__(
+        self, path: str, name: str, *, title: Union[str, None] = "Dashboard"
+    ) -> None:
+        super().__init__(path, name, ["GET"], title=title)
+
+    async def handle(self, request: Request) -> Response:
+        return templates.TemplateResponse(
+            request,
+            "views/admin/index.html.jinja",
+            {
+                "page_title": await self.get_title(request),
+                "breadcrumbs": await self.get_breadcrumbs(request),
+                "view": self,
+            },
+        )

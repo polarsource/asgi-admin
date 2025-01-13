@@ -30,12 +30,12 @@
       class="menu column is-2 is-narrow-mobile is-fullheight section is-hidden-mobile"
     >
       <ul class="menu-list">
-        {% for item in _asgi_admin_navigation %}
+        {% for viewset in _asgi_admin_navigation %}
           <li>
             <a
-              class="{{ 'is-active' if _asgi_admin_current_route.view == item.view else '' }}"
-              href="{{ url_for(item.index_route) }}"
-              >{{ item.title }}</a
+              class="{{ 'is-active' if _asgi_admin_current_route.is_nested(viewset) else '' }}"
+              href="{{ url_for(viewset.get_index_view().route_name) }}"
+              >{{ viewset.title }}</a
             >
           </li>
         {% endfor %}

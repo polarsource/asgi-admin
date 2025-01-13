@@ -1,43 +1,14 @@
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Union, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 from starlette.applications import Starlette
-from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.routing import Route
+from starlette.routing import BaseRoute
 
 from .exceptions import ASGIAdminError
 
 if TYPE_CHECKING:
     from .views import ViewBase
-
-
-class RouteView(Route):
-    """
-    Subclass of `starlette.routing.Route` that includes a reference
-    to the view that defines the route.
-    """
-
-    def __init__(
-        self,
-        path: str,
-        endpoint: Callable[..., Any],
-        view: "ViewBase",
-        *,
-        methods: Union[list[str], None] = None,
-        name: Union[str, None] = None,
-        include_in_schema: bool = True,
-        middleware: Union[Sequence[Middleware], None] = None,
-    ) -> None:
-        super().__init__(
-            path,
-            endpoint,
-            methods=methods,
-            name=name,
-            include_in_schema=include_in_schema,
-            middleware=middleware,
-        )
-        self.view = view
 
 
 class CurrentRouteNotFound(ASGIAdminError):
@@ -50,21 +21,21 @@ class CurrentRouteNotFound(ASGIAdminError):
 
 
 def _get_current_route(
-    routes: list[RouteView], endpoint: Callable[..., Any]
-) -> RouteView:
+    routes: list[BaseRoute], endpoint: Callable[..., Any]
+) -> "ViewBase":
     for route in routes:
         if getattr(route, "endpoint", None) == endpoint:
-            return route
+            return endpoint  # type: ignore
         if sub_route := getattr(route, "routes", None):
             return _get_current_route(sub_route, endpoint)
     raise CurrentRouteNotFound()  # pragma: no cover
 
 
-def get_current_route(request: Request) -> RouteView:
+def get_current_route(request: Request) -> "ViewBase":
     app: Starlette = request.scope["app"]
     endpoint: Callable[..., Any] = request.scope["endpoint"]
-    routes: list[RouteView] = cast(list[RouteView], app.routes)
+    routes: list[BaseRoute] = cast(list[BaseRoute], app.routes)
     return _get_current_route(routes, endpoint)
 
 
-__all__ = ["RouteView", "get_current_route"]
+__all__ = ["get_current_route"]
