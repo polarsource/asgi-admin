@@ -12,7 +12,6 @@ from starlette.responses import Response
 from typing_extensions import TypeAlias
 from wtforms import StringField, validators
 
-from asgi_admin.exceptions import ASGIAdminNotFound
 from asgi_admin.repository import RepositoryProtocol, Sorting, SortingOrder
 from asgi_admin.templating import Renderer
 from asgi_admin.views import ModelView
@@ -79,6 +78,20 @@ async def get_my_model_repository(
 
 
 def create_admin(items: MyModelMapping) -> AdminViewSet:
+    class ModelViewCustom(ModelView[MyModel]):
+        async def handle(self, request: Request) -> Response:
+            return await self.render_template(request, "custom.html.jinja")
+
+    class ModelViewItemCustom(ModelView[MyModel]):
+        async def handle(self, request: Request) -> Response:
+            async with self.viewset.get_repository(request) as repository:
+                item = await self.get_by_pk_or_404(
+                    repository, request.path_params["pk"]
+                )
+                return await self.render_template(
+                    request, "item_custom.html.jinja", {"item": item}
+                )
+
     my_model_viewset = ModelViewSet[MyModel](
         name="my-model",
         title="My Model",
@@ -102,19 +115,13 @@ def create_admin(items: MyModelMapping) -> AdminViewSet:
             ),
         ),
     )
-
-    class ModelViewCustom(ModelView[MyModel]):
-        async def handle(self, request: Request) -> Response:
-            async with self.viewset.get_repository(request) as repository:
-                item = await self.get_by_pk_or_404(
-                    repository, request.path_params["pk"]
-                )
-                return await self.render_template(
-                    request, "custom.html.jinja", {"item": item}
-                )
-
-    my_model_viewset.add_view(
-        ModelViewCustom(path="/{pk}/custom", name="custom", title="My Custom View")
+    my_model_viewset.add_general_view(
+        ModelViewCustom(path="/custom", name="custom", title="My Custom View")
+    )
+    my_model_viewset.add_item_view(
+        ModelViewItemCustom(
+            path="/{pk}/custom-item", name="custom_item", title="My Custom Item View"
+        )
     )
 
     admin = AdminViewSet(

@@ -84,9 +84,15 @@ class ViewSet:
             return self.parent_viewset.renderer
         raise NoRendererSetError(self)
 
-    def add_view(self, view: "ViewBase") -> None:
+    def add_view(
+        self, view: "ViewBase", *, before: Union["ViewBase", None] = None
+    ) -> None:
         view.viewset = self
-        self.views.append(view)
+        if before is not None:
+            index = self.views.index(before)
+            self.views.insert(index, view)
+        else:
+            self.views.append(view)
 
     def get_view(self, name: str) -> Union["ViewBase", None]:
         for view in self.views:
@@ -129,12 +135,21 @@ class ViewSet:
         return self.parent_viewset.get_breadcrumbs(request, breadcrumbs=breadcrumbs)
 
 
+class NotExistingViewError(ASGIAdminConfigurationError):
+    def __init__(self, viewset: "ModelViewSet", view: str) -> None:
+        self.viewset = viewset
+        self.view_name = view
+        super().__init__(f"View {view} is not found in viewset {viewset.name}.")
+
+
 class ModelViewSet(Generic[Model], ViewSet):
     get_repository: Callable[
         [Request], contextlib.AbstractAsyncContextManager[RepositoryProtocol[Model]]
     ]
     pk_getter: Callable[[Model], Any]
     item_title_getter: Callable[[Model], str]
+    general_view_names: list[str]
+    item_view_names: list[str]
 
     def __init__(
         self,
@@ -181,7 +196,7 @@ class ModelViewSet(Generic[Model], ViewSet):
             ModelViewEdit(
                 edit_fields=edit_fields,
                 edit_form_class=edit_form_class,
-                path="/{pk}",
+                path="/{pk:str}",
                 name="edit",
             ),
             *views,
@@ -196,6 +211,17 @@ class ModelViewSet(Generic[Model], ViewSet):
             middleware=middleware,
             renderer=renderer,
         )
+
+        self.general_view_names = []
+        self.item_view_names = []
+
+    def add_general_view(self, view: ViewBase) -> None:
+        self.general_view_names.append(view.name)
+        self.add_view(view, before=self.get_view("edit"))
+
+    def add_item_view(self, view: ViewBase) -> None:
+        self.item_view_names.append(view.name)
+        self.add_view(view)
 
 
 class AdminViewSetMiddleware:

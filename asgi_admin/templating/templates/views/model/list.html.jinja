@@ -3,26 +3,47 @@
 {% import "macros/clipboard.html.jinja" as clipboard %}
 
 {% block content %}
-  <div class="flex h-full justify-end">
-    {% if view.query_fields %}
-      <form action method="GET">
-        <label class="input">
-          {{ icons.magnifying_glass("h-[1em] opacity-50") }}
-          <input
-            class="grow"
-            type="search"
-            placeholder="Query by {{ view.query_fields | map('keygetter', view.fields) | map('untitle') | join(', ') }}"
-            name="query"
-            value="{{ query or '' }}"
-          />
-        </label>
-      </form>
-    {% endif %}
+  <div class="flex h-full justify-between">
+    <div>
+      {% if view.viewset.general_view_names %}
+        <ul
+          class="menu menu-vertical lg:menu-horizontal bg-base-200 rounded-box"
+        >
+          {% for view_name in view.viewset.general_view_names %}
+            {% set general_view = view.viewset.get_view(view_name) %}
+            <li>
+              <a href="{{ url_for(general_view.route_name) }}"
+                >{{ general_view.title }}</a
+              >
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+    <div>
+      {% if view.query_fields %}
+        <form action method="GET">
+          <label class="input">
+            {{ icons.magnifying_glass("h-[1em] opacity-50") }}
+            <input
+              class="grow"
+              type="search"
+              placeholder="Query by {{ view.query_fields | map('keygetter', view.fields) | map('untitle') | join(', ') }}"
+              name="query"
+              value="{{ query or '' }}"
+            />
+          </label>
+        </form>
+      {% endif %}
+    </div>
   </div>
   <div class="border-base-200 overflow-x-auto border">
-    <table class="table">
+    <table class="table table-auto">
       <thead>
         <tr>
+          {% if view.viewset.item_view_names %}
+            <th class="w-px"></th>
+          {% endif %}
           {% for field in view.fields %}
             <th>
               {% if field in view.sortable_fields %}
@@ -50,14 +71,41 @@
       </thead>
       <tbody>
         {% for item in items %}
+          {% set item_pk = view.viewset.pk_getter(item) %}
           <tr class="hover">
+            {% if view.viewset.item_view_names %}
+              <td>
+                <button
+                  class="link"
+                  popovertarget="popover-{{ item_pk }}"
+                  style="anchor-name:--anchor-{{ item_pk }}"
+                >
+                  {{ icons.ellipsis_vertical("h-4 w-4") }}
+                </button>
+                <ul
+                  class="dropdown menu rounded-box bg-base-200 w-48 shadow-sm"
+                  popover
+                  id="popover-{{ item_pk }}"
+                  style="position-anchor:--anchor-{{ item_pk }}"
+                >
+                  {% for view_name in view.viewset.item_view_names %}
+                    {% set item_view = view.viewset.get_view(view_name) %}
+                    <li>
+                      <a href="{{ url_for(item_view.route_name, pk=item_pk) }}"
+                        >{{ item_view.title }}</a
+                      >
+                    </li>
+                  {% endfor %}
+                </ul>
+              </td>
+            {% endif %}
             {% for field in view.fields %}
               <td class="group">
                 <div class="flex flex-row items-center gap-2">
                   {% if loop.first %}
                     <a
                       class="link link-hover link-primary"
-                      href="{{ request.url_for(view.viewset.get_view('edit').route_name, pk=view.viewset.pk_getter(item)) }}"
+                      href="{{ request.url_for(view.viewset.get_view('edit').route_name, pk=item_pk) }}"
                       >{{ item[field] }}</a
                     >
                   {% else %}
