@@ -14,7 +14,7 @@ from asgi_admin._constants import ROUTE_NAME_SEPARATOR
 
 from ._breadcrumbs import BreadcrumbItem
 from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
-from .repository import Model, Sorting, SortingOrder
+from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
 from .templating import Renderer, default_renderer
 
 if TYPE_CHECKING:
@@ -103,7 +103,7 @@ class ViewBase:
         breadcrumbs.append({"label": title, "url": request.url, "active": True})
         return breadcrumbs
 
-    def render_template(
+    async def render_template(
         self,
         request: Request,
         name: str,
@@ -113,6 +113,12 @@ class ViewBase:
         media_type: Union[str, None] = None,
         background: Union[BackgroundTask, None] = None,
     ) -> Response:
+        context = {
+            "page_title": await self.get_title(request),
+            "breadcrumbs": await self.get_breadcrumbs(request),
+            "view": self,
+            **(context or {}),
+        }
         return self.renderer.TemplateResponse(
             request,
             name,
@@ -145,6 +151,14 @@ class ModelView(Generic[Model], ViewBase):
     @viewset.setter
     def viewset(self, viewset: "ModelViewSet[Model]") -> None:
         self._viewset = viewset
+
+    async def get_by_pk_or_404(
+        self, repository: RepositoryProtocol[Model], pk: Any
+    ) -> Model:
+        item = await repository.get_by_pk(pk)
+        if item is None:
+            raise ASGIAdminNotFound()
+        return item
 
 
 class PaginationOutput(TypedDict):
@@ -201,13 +215,10 @@ class ModelViewList(ModelView[Model]):
                 sorting, offset, limit, query=query, query_fields=self.query_fields
             )
 
-        return self.render_template(
+        return await self.render_template(
             request,
             "views/model/list.html.jinja",
             {
-                "page_title": await self.get_title(request),
-                "breadcrumbs": await self.get_breadcrumbs(request),
-                "view": self,
                 "items": items,
                 "pagination": self._get_pagination_output(
                     request, offset, limit, total
@@ -352,9 +363,7 @@ class ModelViewEdit(ModelView[Model]):
 
     async def handle(self, request: Request) -> Response:
         async with self.viewset.get_repository(request) as repository:
-            item = await repository.get_by_id(request.path_params["pk"])
-            if item is None:
-                raise ASGIAdminNotFound()
+            item = await self.get_by_pk_or_404(repository, request.path_params["pk"])
             request.state.item = item
 
             form_data = await request.form()
@@ -368,16 +377,10 @@ class ModelViewEdit(ModelView[Model]):
                 else:
                     status_code = 400
 
-        return self.render_template(
+        return await self.render_template(
             request,
             "views/model/edit.html.jinja",
-            {
-                "page_title": await self.get_title(request),
-                "breadcrumbs": await self.get_breadcrumbs(request),
-                "view": self,
-                "item": item,
-                "form": form,
-            },
+            {"item": item, "form": form},
             status_code=status_code,
         )
 
@@ -397,12 +400,4 @@ class AdminIndexView(ViewBase):
         super().__init__(path, name, ["GET"], title=title)
 
     async def handle(self, request: Request) -> Response:
-        return self.render_template(
-            request,
-            "views/admin/index.html.jinja",
-            {
-                "page_title": await self.get_title(request),
-                "breadcrumbs": await self.get_breadcrumbs(request),
-                "view": self,
-            },
-        )
+        return await self.render_template(request, "views/admin/index.html.jinja")

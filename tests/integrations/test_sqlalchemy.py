@@ -133,7 +133,7 @@ class TestRepositoryList:
 class TestRepositoryGetById:
     async def test_not_existing(self, session: AsyncSession) -> None:
         repository = MyModelRepository(session)
-        item = await repository.get_by_id(1)
+        item = await repository.get_by_pk(1)
         assert item is None
 
     async def test_existing(self, session: AsyncSession) -> None:
@@ -142,7 +142,7 @@ class TestRepositoryGetById:
         await session.flush()
 
         repository = MyModelRepository(session)
-        result = await repository.get_by_id(item.id)
+        result = await repository.get_by_pk(item.id)
         assert result == item
 
 

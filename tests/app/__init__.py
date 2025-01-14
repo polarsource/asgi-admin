@@ -39,8 +39,8 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
         query: Union[str, None] = None,
         query_fields: Union[Iterable[str], None] = None,
     ) -> tuple[int, Sequence[MyModel]]:
-        # Filtering
-        def _filter_function(item: MyModel) -> bool:
+        # Queryin
+        def _query_function(item: MyModel) -> bool:
             if query is None or not query_fields:
                 return True
             for query_field in query_fields:
@@ -48,7 +48,7 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
                     return True
             return False
 
-        items = [item for item in list(self._items.values()) if _filter_function(item)]
+        items = [item for item in list(self._items.values()) if _query_function(item)]
 
         # Sorting
         for field, way in reversed(sorting):
@@ -57,8 +57,8 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
         # Offset and limit
         return len(items), items[offset : offset + limit]
 
-    async def get_by_id(self, id: str) -> Union[MyModel, None]:
-        return self._items.get(id)
+    async def get_by_pk(self, pk: str) -> Union[MyModel, None]:
+        return self._items.get(pk)
 
     async def update(self, item: MyModel, data: dict[str, Any]) -> MyModel:
         self._items[item.id] = dataclasses.replace(item, **data)
@@ -106,18 +106,11 @@ def create_admin(items: MyModelMapping) -> AdminViewSet:
     class ModelViewCustom(ModelView[MyModel]):
         async def handle(self, request: Request) -> Response:
             async with self.viewset.get_repository(request) as repository:
-                item = await repository.get_by_id(request.path_params["pk"])
-                if item is None:
-                    raise ASGIAdminNotFound()
-                return self.render_template(
-                    request,
-                    "custom.html.jinja",
-                    {
-                        "page_title": await self.get_title(request),
-                        "breadcrumbs": await self.get_breadcrumbs(request),
-                        "view": self,
-                        "item": item,
-                    },
+                item = await self.get_by_pk_or_404(
+                    repository, request.path_params["pk"]
+                )
+                return await self.render_template(
+                    request, "custom.html.jinja", {"item": item}
                 )
 
     my_model_viewset.add_view(

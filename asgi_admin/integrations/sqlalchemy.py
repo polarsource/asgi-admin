@@ -64,8 +64,8 @@ class RepositoryBase(RepositoryProtocol[Model]):
 
         return count, items
 
-    async def get_by_id(self, id: Any) -> Union[Model, None]:
-        statement = self.get_base_select().where(self.model.id == id)
+    async def get_by_pk(self, pk: Any) -> Union[Model, None]:
+        statement = self.get_base_select().where(self.model.id == pk)
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
 

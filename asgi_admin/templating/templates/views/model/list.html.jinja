@@ -11,7 +11,7 @@
           <input
             class="grow"
             type="search"
-            placeholder="Filter by {{ view.query_fields | map('keygetter', view.fields) | join(', ') }}"
+            placeholder="Query by {{ view.query_fields | map('keygetter', view.fields) | map('untitle') | join(', ') }}"
             name="query"
             value="{{ query or '' }}"
           />

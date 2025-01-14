@@ -26,6 +26,10 @@ def keygetter(key: str, d: dict[str, Any]) -> Any:
     return d.get(key)
 
 
+def untitle(value: str) -> str:
+    return value.lower() if value.istitle() else value
+
+
 def create_environment(
     loaders: Union[Sequence[BaseLoader], None] = None,
 ) -> Environment:
@@ -39,6 +43,7 @@ def create_environment(
         autoescape=select_autoescape(),
     )
     env.filters["keygetter"] = keygetter
+    env.filters["untitle"] = untitle
     return env
 
 
