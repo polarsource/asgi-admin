@@ -1,12 +1,7 @@
 import contextlib
 import functools
 import inspect
-from collections.abc import (
-    AsyncIterator,
-    Callable,
-    Iterable,
-    Sequence,
-)
+from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from typing import Any, Generic, Union
 
 import wtforms
@@ -15,11 +10,21 @@ from starlette.requests import Request
 from starlette.routing import BaseRoute, Mount, Router
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from asgi_admin._constants import ROUTE_NAME_SEPARATOR, SCOPE_NAVIGATION_KEY
-
 from ._breadcrumbs import BreadcrumbItem
+from ._constants import ROUTE_NAME_SEPARATOR, SCOPE_NAVIGATION_KEY
+from .exceptions import ASGIAdminConfigurationError
 from .repository import Model, RepositoryProtocol
+from .templating import Renderer, default_renderer
 from .views import AdminIndexView, ModelViewEdit, ModelViewList, ViewBase
+
+
+class NoRendererSetError(ASGIAdminConfigurationError):
+    def __init__(self, viewset: "ViewSet") -> None:
+        self.viewset = viewset
+        super().__init__(
+            f"No template renderer is set on viewset {viewset.name}. "
+            "A viewset or one of its ancestors must have a renderer set to render a template."
+        )
 
 
 class ViewSet:
@@ -29,6 +34,7 @@ class ViewSet:
     parent_viewset: Union["ViewSet", None] = None
     viewsets: dict[str, "ViewSet"]
     middleware: list[Middleware]
+    _renderer: Union[Renderer, None] = None
 
     def __init__(
         self,
@@ -39,6 +45,7 @@ class ViewSet:
         title: Union[str, None] = None,
         index_view_name: Union[str, None] = None,
         middleware: Union[Sequence[Middleware], None] = None,
+        renderer: Union[Renderer, None] = None,
     ) -> None:
         self.name = name
 
@@ -54,6 +61,7 @@ class ViewSet:
         self.index_view_name = index_view_name
 
         self.middleware = [] if middleware is None else list(middleware)
+        self._renderer = renderer
 
     @functools.cached_property
     def route_name(self) -> str:
@@ -67,6 +75,14 @@ class ViewSet:
         for prefix, viewset in self.viewsets.items():
             routes.append(Mount(prefix, app=viewset.router))
         return Router(routes=routes, middleware=self.middleware)
+
+    @property
+    def renderer(self) -> Renderer:
+        if self._renderer is not None:
+            return self._renderer
+        if self.parent_viewset is not None:
+            return self.parent_viewset.renderer
+        raise NoRendererSetError(self)
 
     def add_view(self, view: "ViewBase") -> None:
         view.viewset = self
@@ -142,6 +158,7 @@ class ModelViewSet(Generic[Model], ViewSet):
         viewsets: Union[dict[str, "ViewSet"], None] = None,
         title: str,
         middleware: Union[Sequence[Middleware], None] = None,
+        renderer: Union[Renderer, None] = None,
     ) -> None:
         if inspect.isasyncgenfunction(get_repository):
             self.get_repository = contextlib.asynccontextmanager(get_repository)
@@ -177,6 +194,7 @@ class ModelViewSet(Generic[Model], ViewSet):
             title=title,
             index_view_name="list",
             middleware=middleware,
+            renderer=renderer,
         )
 
 
@@ -200,6 +218,7 @@ class AdminViewSet(ViewSet):
         *,
         title: str = "ASGI Admin",
         middleware: Union[Sequence[Middleware], None] = None,
+        renderer: Renderer = default_renderer,
     ) -> None:
         views = [] if views is None else list(views)
         views = [
@@ -218,4 +237,5 @@ class AdminViewSet(ViewSet):
             index_view_name="index",
             title=title,
             middleware=middleware,
+            renderer=renderer,
         )

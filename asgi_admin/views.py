@@ -1,9 +1,10 @@
 import functools
 import urllib.parse
-from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Callable, Generic, TypedDict, Union
+from collections.abc import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypedDict, Union
 
 import wtforms
+from starlette.background import BackgroundTask
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, request_response
@@ -14,7 +15,7 @@ from asgi_admin._constants import ROUTE_NAME_SEPARATOR
 from ._breadcrumbs import BreadcrumbItem
 from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
 from .repository import Model, Sorting, SortingOrder
-from .templating import templates
+from .templating import Renderer, default_renderer
 
 if TYPE_CHECKING:
     from .viewsets import ModelViewSet, ViewSet
@@ -77,6 +78,12 @@ class ViewBase:
     def viewset(self, viewset: "ViewSet") -> None:
         self._viewset = viewset
 
+    @property
+    def renderer(self) -> Renderer:
+        if self.viewset is None:
+            return default_renderer
+        return self.viewset.renderer
+
     async def get_title(self, request: Request) -> str:
         return self.title
 
@@ -95,6 +102,26 @@ class ViewBase:
         title = await self.get_title(request)
         breadcrumbs.append({"label": title, "url": request.url, "active": True})
         return breadcrumbs
+
+    def render_template(
+        self,
+        request: Request,
+        name: str,
+        context: Union[dict[str, Any], None] = None,
+        status_code: int = 200,
+        headers: Union[Mapping[str, str], None] = None,
+        media_type: Union[str, None] = None,
+        background: Union[BackgroundTask, None] = None,
+    ) -> Response:
+        return self.renderer.TemplateResponse(
+            request,
+            name,
+            context,
+            status_code=status_code,
+            headers=headers,
+            media_type=media_type,
+            background=background,
+        )
 
 
 class NotTiedToModelViewSetError(ViewConfigurationError):
@@ -174,7 +201,7 @@ class ModelViewList(ModelView[Model]):
                 sorting, offset, limit, query=query, query_fields=self.query_fields
             )
 
-        return templates.TemplateResponse(
+        return self.render_template(
             request,
             "views/model/list.html.jinja",
             {
@@ -341,7 +368,7 @@ class ModelViewEdit(ModelView[Model]):
                 else:
                     status_code = 400
 
-        return templates.TemplateResponse(
+        return self.render_template(
             request,
             "views/model/edit.html.jinja",
             {
@@ -361,12 +388,16 @@ class ModelViewEdit(ModelView[Model]):
 
 class AdminIndexView(ViewBase):
     def __init__(
-        self, path: str, name: str, *, title: Union[str, None] = "Dashboard"
+        self,
+        path: str,
+        name: str,
+        *,
+        title: Union[str, None] = "Dashboard",
     ) -> None:
         super().__init__(path, name, ["GET"], title=title)
 
     async def handle(self, request: Request) -> Response:
-        return templates.TemplateResponse(
+        return self.render_template(
             request,
             "views/admin/index.html.jinja",
             {

@@ -1,6 +1,13 @@
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Union
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import (
+    BaseLoader,
+    ChoiceLoader,
+    Environment,
+    PackageLoader,
+    select_autoescape,
+)
 from starlette.requests import Request
 from starlette.templating import Jinja2Templates
 
@@ -15,17 +22,24 @@ if TYPE_CHECKING:
     from ..views import ViewBase
 
 
-env = Environment(
-    loader=PackageLoader("asgi_admin.templating", "templates"),
-    autoescape=select_autoescape(),
-)
-
-
 def keygetter(key: str, d: dict[str, Any]) -> Any:
     return d.get(key)
 
 
-env.filters["keygetter"] = keygetter
+def create_environment(
+    loaders: Union[Sequence[BaseLoader], None] = None,
+) -> Environment:
+    env = Environment(
+        loader=ChoiceLoader(
+            [
+                *(loaders or ()),
+                PackageLoader("asgi_admin.templating", "templates"),
+            ]
+        ),
+        autoescape=select_autoescape(),
+    )
+    env.filters["keygetter"] = keygetter
+    return env
 
 
 def state_context(request: Request) -> dict[str, Any]:
@@ -38,8 +52,17 @@ def current_route_context(request: Request) -> dict[str, "Union[ViewBase, None]"
     return {CONTEXT_CURRENT_ROUTE_KEY: get_current_route(request)}
 
 
-templates = Jinja2Templates(
-    env=env, context_processors=[state_context, current_route_context]
-)
+class Renderer(Jinja2Templates):
+    def __init__(self, env: Environment) -> None:
+        super().__init__(
+            env=env, context_processors=[state_context, current_route_context]
+        )
 
-__all__ = ["templates"]
+    @classmethod
+    def create_with_loaders(cls, loaders: Sequence[BaseLoader]) -> "Renderer":
+        return cls(env=create_environment(loaders))
+
+
+default_renderer = Renderer(create_environment())
+
+__all__ = ["create_environment", "Renderer", "default_renderer"]
