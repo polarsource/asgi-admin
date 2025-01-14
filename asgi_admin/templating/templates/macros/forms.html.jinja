@@ -1,14 +1,14 @@
 {% macro form_field(field) %}
-  <div class="field">
-    <label class="label">{{ field.label }}</label>
-    <div class="control">
-      {{ field(class="input " ~ (" is-danger" if field.errors else "")) }}
-    </div>
+  <fieldset class="fieldset">
+    <label class="input {{ "input-error" if field.errors else "" }}">
+      <span class="label">{{ field.label }}</span>
+      {{ field }}
+    </label>
     {% for error in field.errors %}
-      <p class="help is-danger">{{ error }}</p>
+      <p class="fieldset-label text-error">{{ error }}</p>
     {% endfor %}
     {% if field.description %}
-      <p class="help">{{ field.description }}</p>
+      <p class="fieldset-label">{{ field.description }}</p>
     {% endif %}
-  </div>
+  </fieldset>
 {% endmacro %}

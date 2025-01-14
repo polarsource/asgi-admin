@@ -7,13 +7,13 @@
     _="
     on click call navigator.clipboard.writeText('{{ text }}')
     then add @disabled to me
-    then toggle .is-hidden on <svg /> in me
+    then toggle .hidden on <svg /> in me
     then wait 5s
-    then toggle .is-hidden on <svg /> in me
+    then toggle .hidden on <svg /> in me
     then remove @disabled from me
   "
   >
-    {{ icons.clipboard("icon is-small") }}
-    {{ icons.clipboard_document_check("icon is-small is-hidden") }}
+    {{ icons.clipboard("h-4 w-4") }}
+    {{ icons.clipboard_document_check("h-4 w-4 hidden") }}
   </button>
 {% endmacro %}

@@ -1,31 +1,8 @@
 {% extends "layout.html.jinja" %}
 
-{% block head %}
-  {{ super() }}
-  <style>
-    td button.copy-cell-button {
-      visibility: hidden;
-    }
-
-    td:hover button.copy-cell-button {
-      visibility: visible;
-    }
-  </style>
-{% endblock %}
-
 {% block container %}
-  <section class="section">
-    <nav class="breadcrumb" aria-label="breadcrumbs">
-      <ul>
-        {% for breadcrumb in breadcrumbs %}
-          <li class="{{ 'is-active' if breadcrumb.active else '' }}">
-            <a href="{{ breadcrumb.url }}">{{ breadcrumb.label }}</a>
-          </li>
-        {% endfor %}
-      </ul>
-    </nav>
-    <h1 class="title">{{ page_title }}</h1>
-
+  <div class="flex flex-col gap-4">
+    <h1 class="text-4xl">{{ page_title }}</h1>
     {% block content %}{% endblock %}
-  </section>
+  </div>
 {% endblock %}

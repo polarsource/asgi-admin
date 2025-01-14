@@ -3,100 +3,98 @@
 {% import "macros/clipboard.html.jinja" as clipboard %}
 
 {% block content %}
-  <div class="level">
-    <div class="level-left"></div>
-    <div class="level-right">
-      {% if view.query_fields %}
-        <form action method="GET">
+  <div class="flex h-full justify-end">
+    {% if view.query_fields %}
+      <form action method="GET">
+        <label class="input">
+          {{ icons.magnifying_glass("h-[1em] opacity-50") }}
           <input
-            class="input"
-            type="text"
+            class="grow"
+            type="search"
             placeholder="Filter by {{ view.query_fields | map('keygetter', view.fields) | join(', ') }}"
             name="query"
             value="{{ query or '' }}"
           />
-        </form>
-      {% endif %}
-    </div>
+        </label>
+      </form>
+    {% endif %}
   </div>
-  <table class="is-fullwidth is-hoverable is-bordered table">
-    <thead>
-      <tr>
-        {% for field in view.fields %}
-          <th>
-            {% if field in view.sortable_fields %}
-              <a class="" href="{{ sorting.get_sorting_route(field) }}">
-                <span class="icon-text">
+  <div class="border-base-200 overflow-x-auto border">
+    <table class="table">
+      <thead>
+        <tr>
+          {% for field in view.fields %}
+            <th>
+              {% if field in view.sortable_fields %}
+                <a
+                  class="link link-hover flex flex-row items-center gap-1"
+                  href="{{ sorting.get_sorting_route(field) }}"
+                >
                   {{ view.fields[field] }}
                   {% if sorting.fields[field] %}
                     {% if sorting.fields[field] == "ASC" %}
-                      {{ icons.arrow_long_down("icon is-small") }}
+                      {{ icons.arrow_long_down("h-4 w-4") }}
                     {% else %}
-                      {{ icons.arrow_long_up("icon is-small") }}
+                      {{ icons.arrow_long_up("h-4 w-4") }}
                     {% endif %}
                   {% else %}
-                    <span class="icon is-small"></span>
+                    <span class="h-4 w-4"></span>
                   {% endif %}
-                </span>
-              </a>
-            {% else %}
-              {{ view.fields[field] }}
-            {% endif %}
-          </th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-        <tr>
-          {% for field in view.fields %}
-            <td>
-              <div class="is-flex is-justify-content-space-between">
-                {% if loop.first %}
-                  <a
-                    href="{{ request.url_for(view.viewset.get_view('edit').route_name, pk=view.viewset.pk_getter(item)) }}"
-                    >{{ item[field] }}</a
-                  >
-                {% else %}
-                  {{ item[field] }}
-                {% endif %}
-                {{ clipboard.copy(item[field], class="copy-cell-button") }}
-              </div>
-            </td>
+                </a>
+              {% else %}
+                {{ view.fields[field] }}
+              {% endif %}
+            </th>
           {% endfor %}
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="level">
-    <div class="level-left">
-      <div class="level-item">
-        Showing&nbsp;
-        <span class="has-text-weight-semibold">{{ pagination.range[0] }}</span>
-        &nbsp;to&nbsp;
-        <span class="has-text-weight-semibold">{{ pagination.range[1] }}</span>
-        &nbsp;of&nbsp;
-        <span class="has-text-weight-semibold">{{ pagination.total }}</span>
-        &nbsp;entries
-      </div>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr class="hover">
+            {% for field in view.fields %}
+              <td class="group">
+                <div class="flex flex-row items-center gap-2">
+                  {% if loop.first %}
+                    <a
+                      class="link link-hover link-primary"
+                      href="{{ request.url_for(view.viewset.get_view('edit').route_name, pk=view.viewset.pk_getter(item)) }}"
+                      >{{ item[field] }}</a
+                    >
+                  {% else %}
+                    {{ item[field] }}
+                  {% endif %}
+                  {{ clipboard.copy(item[field], class="invisible group-hover:visible") }}
+                </div>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex justify-between">
+    <div class="text-sm">
+      Showing
+      <span class="font-bold">{{ pagination.range[0] }}</span>
+      to
+      <span class="font-bold">{{ pagination.range[1] }}</span>
+      of
+      <span class="font-bold">{{ pagination.total }}</span>
+      entries
     </div>
-    <div class="level-right">
-      <div class="level-item">
-        <div class="buttons">
-          <a
-            class="button"
-            href="{{ pagination.previous_route or '' }}"
-            {{ 'disabled' if not pagination.previous_route else '' }}
-            >Previous</a
-          >
-          <a
-            class="button"
-            href="{{ pagination.next_route or '' }}"
-            {{ 'disabled' if not pagination.next_route else '' }}
-            >Next</a
-          >
-        </div>
-      </div>
+    <div class="join grid grid-cols-2">
+      <a
+        class="join-item btn btn-primary"
+        href="{{ pagination.previous_route or '' }}"
+        {{ 'disabled' if not pagination.previous_route else '' }}
+        >Previous</a
+      >
+      <a
+        class="join-item btn btn-primary"
+        href="{{ pagination.next_route or '' }}"
+        {{ 'disabled' if not pagination.next_route else '' }}
+        >Next</a
+      >
     </div>
   </div>
 {% endblock %}

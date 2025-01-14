@@ -1,39 +1,45 @@
 {% extends "base.html.jinja" %}
-
-{% block head %}
-  <style>
-    .menu {
-      background-color: var(--bulma-white-ter);
-      --bulma-menu-item-h: 220;
-      --bulma-menu-item-s: 14%;
-      --bulma-menu-item-background-l: 96%;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .menu {
-        background-color: var(--bulma-black-ter);
-        --bulma-menu-item-h: 222;
-        --bulma-menu-item-s: 14%;
-        --bulma-menu-item-background-l: 14%;
-      }
-    }
-
-    .icon-text {
-      align-items: center;
-    }
-  </style>
-{% endblock %}
+{% import "macros/icons.html.jinja" as icons %}
 
 {% block body %}
-  <div class="columns">
-    <aside
-      class="menu column is-2 is-narrow-mobile is-fullheight section is-hidden-mobile"
-    >
-      <ul class="menu-list">
+  <div class="drawer lg:drawer-open">
+    <input id="menu-toggle" type="checkbox" class="drawer-toggle" />
+    <main class="drawer-content flex flex-col gap-4 p-4">
+      <div class="flex flex-row items-center">
+        <label for="menu-toggle" class="btn btn-ghost drawer-button lg:hidden">
+          {{ icons.bars_3("h-4 w-4") }}
+        </label>
+        {% block breadcrumbs %}
+          {% if breadcrumbs %}
+            <div class="breadcrumbs text-sm">
+              <ul>
+                {% for breadcrumb in breadcrumbs %}
+                  {% if breadcrumb.active %}
+                    <li>{{ breadcrumb.label }}</li>
+                  {% else %}
+                    <li>
+                      <a href="{{ breadcrumb.url }}">{{ breadcrumb.label }}</a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        {% endblock %}
+      </div>
+      <div class="h-full w-full">{% block container %}{% endblock %}</div>
+    </main>
+    <aside class="drawer-side">
+      <label
+        for="menu-toggle"
+        aria-label="close sidebar"
+        class="drawer-overlay"
+      ></label>
+      <ul class="menu bg-base-200 text-base-content min-h-full w-60 p-4">
         {% for viewset in _asgi_admin_navigation %}
           <li>
             <a
-              class="{{ 'is-active' if _asgi_admin_current_route.is_nested(viewset) else '' }}"
+              class="{{ 'menu-active' if _asgi_admin_current_route.is_nested(viewset) else '' }}"
               href="{{ url_for(viewset.get_index_view().route_name) }}"
               >{{ viewset.title }}</a
             >
@@ -41,9 +47,5 @@
         {% endfor %}
       </ul>
     </aside>
-
-    <main class="column is-10 section is-background-grey-lighter">
-      <div class="container">{% block container %}{% endblock %}</div>
-    </main>
   </div>
 {% endblock %}

@@ -5,21 +5,18 @@
   <form
     method="POST"
     action="{{ url_for(_asgi_admin_current_route.route_name, pk=view.viewset.pk_getter(item)) }}"
+    class="flex flex-col gap-4"
   >
     {% for field in form %}
       {{ forms.form_field(field) }}
     {% endfor %}
-    <div class="field is-grouped">
-      <div class="control">
-        <a
-          href="{{ url_for(view.viewset.get_index_view().route_name) }}"
-          class="button"
-          >Cancel</a
-        >
-      </div>
-      <div class="control">
-        <button class="button is-primary" type="submit">Save</button>
-      </div>
+    <div class="flex flex-row gap-2">
+      <a
+        href="{{ url_for(view.viewset.get_index_view().route_name) }}"
+        class="btn btn-primary btn-outline"
+        >Cancel</a
+      >
+      <button class="btn btn-primary" type="submit">Save</button>
     </div>
   </form>
 {% endblock %}
