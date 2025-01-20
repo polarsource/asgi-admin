@@ -18,7 +18,7 @@ from asgi_admin._constants import ROUTE_NAME_SEPARATOR, SCOPE_ROOT_VIEW
 from ._breadcrumbs import BreadcrumbItem
 from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
 from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
-from .templating import Renderer
+from .templating import Renderer, default_renderer
 
 if TYPE_CHECKING:
     pass
@@ -781,7 +781,7 @@ class AdminViewGroup(ViewGroup):
         index_view: Union[str, None] = None,
         parent: Union["ViewBase", None] = None,
         children: Union[Sequence["ViewBase"], None] = None,
-        renderer: Union[Renderer, None] = None,
+        renderer: Union[Renderer, None] = default_renderer,
         middleware: Union[Sequence[Middleware], None] = None,
     ) -> None:
         super().__init__(
