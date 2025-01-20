@@ -84,5 +84,11 @@ class RepositoryBase(RepositoryProtocol[Model]):
             await self.session.flush()
         return item
 
+    async def get_one_or_none(
+        self, statement: Select[tuple[Model]]
+    ) -> Union[Model, None]:
+        result = await self.session.execute(statement)
+        return result.scalar_one_or_none()
+
     def get_base_select(self) -> Select[tuple[Model]]:
         return select(self.model)
