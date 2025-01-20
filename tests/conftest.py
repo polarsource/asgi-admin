@@ -26,7 +26,7 @@ def items() -> MyModelMapping:
 def app(items: MyModelMapping) -> Starlette:
     app = Starlette()
     admin = create_admin(items)
-    app.mount("/admin", admin.router)
+    app.mount("/admin", admin.route)
     return app
 
 

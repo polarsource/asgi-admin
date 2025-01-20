@@ -2,8 +2,6 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup
 
-from asgi_admin.views import ModelViewList, NotTiedToModelViewSetError
-
 from .app import MyModel, MyModelMapping
 
 
@@ -14,13 +12,6 @@ def first_item(items: MyModelMapping) -> MyModel:
 
 @pytest.mark.asyncio
 class TestModelViewList:
-    async def test_orphan_view(self) -> None:
-        with pytest.raises(NotTiedToModelViewSetError):
-            view = ModelViewList[MyModel](
-                title="My Model", fields=["id", "label"], path="/", name="list"
-            )
-            view.viewset
-
     async def test_basic(
         self, client: httpx.AsyncClient, items: MyModelMapping
     ) -> None:

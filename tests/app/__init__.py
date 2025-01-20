@@ -14,8 +14,15 @@ from wtforms import StringField, validators
 
 from asgi_admin.repository import RepositoryProtocol, Sorting, SortingOrder
 from asgi_admin.templating import Renderer
-from asgi_admin.views import ModelView
-from asgi_admin.viewsets import AdminViewSet, ModelViewSet
+from asgi_admin.views import (
+    AdminViewGroup,
+    AdminViewIndex,
+    ModelView,
+    ModelViewEdit,
+    ModelViewGroup,
+    ModelViewList,
+    ViewBase,
+)
 
 
 @dataclasses.dataclass
@@ -28,6 +35,12 @@ class MyModel:
 class MyModelRepository(RepositoryProtocol[MyModel]):
     def __init__(self, items: dict[str, MyModel]) -> None:
         self._items = items
+
+    def get_pk(self, item: MyModel) -> str:
+        return item.id
+
+    def get_title(self, item: MyModel) -> str:
+        return item.label
 
     async def list(
         self,
@@ -77,59 +90,82 @@ async def get_my_model_repository(
     yield MyModelRepository(items)
 
 
-def create_admin(items: MyModelMapping) -> AdminViewSet:
+def create_admin(items: MyModelMapping) -> ViewBase:
     class ModelViewCustom(ModelView[MyModel]):
-        async def handle(self, request: Request) -> Response:
+        async def model_endpoint(
+            self, request: Request, repository: RepositoryProtocol[MyModel]
+        ) -> Response:
             return await self.render_template(request, "custom.html.jinja")
 
     class ModelViewItemCustom(ModelView[MyModel]):
-        async def handle(self, request: Request) -> Response:
-            async with self.viewset.get_repository(request) as repository:
-                item = await self.get_by_pk_or_404(
-                    repository, request.path_params["pk"]
-                )
-                return await self.render_template(
-                    request, "item_custom.html.jinja", {"item": item}
-                )
+        async def model_endpoint(
+            self, request: Request, repository: RepositoryProtocol[MyModel]
+        ) -> Response:
+            item = await self.get_by_pk_or_404(repository, request.path_params["pk"])
+            return await self.render_template(
+                request, "item_custom.html.jinja", {"item": item}
+            )
 
-    my_model_viewset = ModelViewSet[MyModel](
-        name="my-model",
-        title="My Model",
-        get_repository=functools.partial(get_my_model_repository, items),
-        pk_getter=attrgetter("id"),
-        item_title_getter=attrgetter("label"),
-        list_fields=(
-            ("id", "ID"),
-            ("label", "Label"),
-            ("created_at", "Created At"),
+    return AdminViewGroup(
+        renderer=Renderer.create_with_loaders(
+            [PackageLoader("tests.app", "templates")]
         ),
-        list_query_fields=("id", "label"),
-        edit_fields=(
-            (
-                "label",
-                StringField(
-                    "Label",
-                    description="The label of the item",
-                    validators=[validators.InputRequired(), validators.Length(min=3)],
-                ),
+        index_view="index",
+        children=[
+            AdminViewIndex("/"),
+            ModelViewGroup[MyModel](
+                "/my-model",
+                "my_model",
+                title="My Model",
+                get_repository=functools.partial(get_my_model_repository, items),
+                index_view="list",
+                children=[
+                    ModelViewList[MyModel](
+                        path="/",
+                        name="list",
+                        title="List",
+                        fields=(
+                            ("id", "ID"),
+                            ("label", "Label"),
+                            ("created_at", "Created At"),
+                        ),
+                        query_fields=("id", "label"),
+                        details_view_name="edit",
+                    ),
+                    ModelViewCustom(
+                        path="/custom",
+                        name="custom",
+                        title="My Custom View",
+                    ),
+                    ModelViewEdit[MyModel](
+                        path="/{pk}",
+                        name="edit",
+                        title="Edit",
+                        fields=(
+                            (
+                                "label",
+                                StringField(
+                                    "Label",
+                                    description="The label of the item",
+                                    validators=[
+                                        validators.InputRequired(),
+                                        validators.Length(min=3),
+                                    ],
+                                ),
+                            ),
+                        ),
+                    ),
+                    ModelViewItemCustom(
+                        path="/{pk}/custom-item",
+                        name="custom_item",
+                        title="My Custom Item View",
+                        navigation=False,
+                        item_view=True,
+                    ),
+                ],
             ),
-        ),
+        ],
     )
-    my_model_viewset.add_general_view(
-        ModelViewCustom(path="/custom", name="custom", title="My Custom View")
-    )
-    my_model_viewset.add_item_view(
-        ModelViewItemCustom(
-            path="/{pk}/custom-item", name="custom_item", title="My Custom Item View"
-        )
-    )
-
-    admin = AdminViewSet(
-        renderer=Renderer.create_with_loaders([PackageLoader("tests.app", "templates")])
-    )
-    admin.add_viewset(my_model_viewset)
-
-    return admin
 
 
 app = Starlette()
@@ -143,4 +179,4 @@ admin = create_admin(
         for i in range(10)
     }
 )
-app.mount("/admin", admin.router)
+app.mount("/admin", admin.route)

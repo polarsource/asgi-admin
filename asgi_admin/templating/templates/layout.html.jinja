@@ -1,6 +1,33 @@
 {% extends "base.html.jinja" %}
 {% import "macros/icons.html.jinja" as icons %}
 
+{% macro navigation_item(view) %}
+  {% if view.navigation %}
+    {% if view.children %}
+      <li>
+        <details
+          {{ 'open' if _asgi_admin_current_route.is_nested(view) else '' }}
+        >
+          <summary>{{ view.title }}</summary>
+          <ul>
+            {% for child in view.children %}
+              {{ navigation_item(child) }}
+            {% endfor %}
+          </ul>
+        </details>
+      </li>
+    {% else %}
+      <li>
+        <a
+          class="{{ 'menu-active' if _asgi_admin_current_route.is_nested(view) else '' }}"
+          href="{{ url_for(view.route_name) }}"
+          >{{ view.title }}</a
+        >
+      </li>
+    {% endif %}
+  {% endif %}
+{% endmacro %}
+
 {% block body %}
   <div class="drawer lg:drawer-open">
     <input id="menu-toggle" type="checkbox" class="drawer-toggle" />
@@ -14,7 +41,7 @@
             <div class="breadcrumbs text-sm">
               <ul>
                 {% for breadcrumb in breadcrumbs %}
-                  {% if breadcrumb.active %}
+                  {% if loop.last %}
                     <li>{{ breadcrumb.label }}</li>
                   {% else %}
                     <li>
@@ -36,14 +63,8 @@
         class="drawer-overlay"
       ></label>
       <ul class="menu bg-base-200 text-base-content min-h-full w-60 p-4">
-        {% for viewset in _asgi_admin_navigation %}
-          <li>
-            <a
-              class="{{ 'menu-active' if _asgi_admin_current_route.is_nested(viewset) else '' }}"
-              href="{{ url_for(viewset.get_index_view().route_name) }}"
-              >{{ viewset.title }}</a
-            >
-          </li>
+        {% for child in _asgi_root_view.children %}
+          {{ navigation_item(child) }}
         {% endfor %}
       </ul>
     </aside>

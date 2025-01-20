@@ -4,7 +4,7 @@
 {% block content %}
   <form
     method="POST"
-    action="{{ url_for(_asgi_admin_current_route.route_name, pk=view.viewset.pk_getter(item)) }}"
+    action="{{ url_for(view.route_name, pk=repository.get_pk(item)) }}"
     class="flex flex-col gap-4"
   >
     {% for field in form %}
@@ -12,7 +12,7 @@
     {% endfor %}
     <div class="flex flex-row gap-2">
       <a
-        href="{{ url_for(view.viewset.get_index_view().route_name) }}"
+        href="{{ url_for(view.parent.get_index_view().route_name) }}"
         class="btn btn-primary btn-outline"
         >Cancel</a
       >

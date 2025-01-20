@@ -11,11 +11,7 @@ from jinja2 import (
 from starlette.requests import Request
 from starlette.templating import Jinja2Templates
 
-from .._constants import (
-    CONTEXT_CURRENT_ROUTE_KEY,
-    CONTEXT_NAVIGATION_KEY,
-    SCOPE_NAVIGATION_KEY,
-)
+from .._constants import CONTEXT_CURRENT_ROUTE_KEY, CONTEXT_ROOT_VIEW, SCOPE_ROOT_VIEW
 from .._routing import get_current_route
 
 if TYPE_CHECKING:
@@ -49,7 +45,7 @@ def create_environment(
 
 def state_context(request: Request) -> dict[str, Any]:
     return {
-        CONTEXT_NAVIGATION_KEY: getattr(request.state, SCOPE_NAVIGATION_KEY),
+        CONTEXT_ROOT_VIEW: getattr(request.state, SCOPE_ROOT_VIEW),
     }
 
 

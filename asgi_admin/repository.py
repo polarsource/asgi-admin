@@ -5,7 +5,6 @@ from typing import Any, Protocol, TypeVar, Union
 from typing_extensions import TypeAlias
 
 Model = TypeVar("Model")
-IDType = TypeVar("IDType")
 
 
 class SortingOrder(str, Enum):
@@ -17,6 +16,10 @@ Sorting: TypeAlias = Sequence[tuple[str, SortingOrder]]
 
 
 class RepositoryProtocol(Protocol[Model]):
+    def get_pk(self, item: Model) -> Any: ...
+
+    def get_title(self, item: Model) -> str: ...
+
     async def list(
         self,
         sorting: Sorting,

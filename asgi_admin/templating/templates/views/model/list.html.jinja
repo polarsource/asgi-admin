@@ -3,23 +3,7 @@
 {% import "macros/clipboard.html.jinja" as clipboard %}
 
 {% block content %}
-  <div class="flex h-full justify-between">
-    <div>
-      {% if view.viewset.general_view_names %}
-        <ul
-          class="menu menu-vertical lg:menu-horizontal bg-base-200 rounded-box"
-        >
-          {% for view_name in view.viewset.general_view_names %}
-            {% set general_view = view.viewset.get_view(view_name) %}
-            <li>
-              <a href="{{ url_for(general_view.route_name) }}"
-                >{{ general_view.title }}</a
-              >
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </div>
+  <div class="flex h-full justify-end">
     <div>
       {% if view.query_fields %}
         <form action method="GET">
@@ -41,7 +25,7 @@
     <table class="table table-auto">
       <thead>
         <tr>
-          {% if view.viewset.item_view_names %}
+          {% if item_views %}
             <th class="w-px"></th>
           {% endif %}
           {% for field in view.fields %}
@@ -71,9 +55,9 @@
       </thead>
       <tbody>
         {% for item in items %}
-          {% set item_pk = view.viewset.pk_getter(item) %}
+          {% set item_pk = repository.get_pk(item) %}
           <tr class="hover">
-            {% if view.viewset.item_view_names %}
+            {% if item_views %}
               <td>
                 <button
                   class="link"
@@ -88,8 +72,7 @@
                   id="popover-{{ item_pk }}"
                   style="position-anchor:--anchor-{{ item_pk }}"
                 >
-                  {% for view_name in view.viewset.item_view_names %}
-                    {% set item_view = view.viewset.get_view(view_name) %}
+                  {% for item_view in item_views %}
                     <li>
                       <a href="{{ url_for(item_view.route_name, pk=item_pk) }}"
                         >{{ item_view.title }}</a
@@ -102,10 +85,10 @@
             {% for field in view.fields %}
               <td class="group">
                 <div class="flex flex-row items-center gap-2">
-                  {% if loop.first %}
+                  {% if loop.first and details_view %}
                     <a
                       class="link link-hover link-primary"
-                      href="{{ request.url_for(view.viewset.get_view('edit').route_name, pk=item_pk) }}"
+                      href="{{ request.url_for(details_view.route_name, pk=item_pk) }}"
                       >{{ item[field] }}</a
                     >
                   {% else %}
