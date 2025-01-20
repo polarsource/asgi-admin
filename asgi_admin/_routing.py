@@ -1,9 +1,8 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Union
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.routing import BaseRoute
 
 from .exceptions import ASGIAdminError
 
@@ -21,21 +20,25 @@ class CurrentRouteNotFound(ASGIAdminError):
 
 
 def _get_current_route(
-    routes: list[BaseRoute], endpoint: Callable[..., Any]
-) -> "ViewBase":
-    for route in routes:
-        if getattr(route, "endpoint", None) == endpoint:
-            return endpoint  # type: ignore
-        if sub_route := getattr(route, "routes", None):
-            return _get_current_route(sub_route, endpoint)
-    raise CurrentRouteNotFound()  # pragma: no cover
+    route: Any, endpoint: Callable[..., Any]
+) -> Union["ViewBase", None]:
+    if getattr(route, "endpoint", None) == endpoint:
+        return endpoint  # type: ignore
+
+    for sub_route in getattr(route, "routes", []):
+        if current_route := _get_current_route(sub_route, endpoint):
+            return current_route
+
+    return None
 
 
 def get_current_route(request: Request) -> "ViewBase":
     app: Starlette = request.scope["app"]
     endpoint: Callable[..., Any] = request.scope["endpoint"]
-    routes: list[BaseRoute] = cast(list[BaseRoute], app.routes)
-    return _get_current_route(routes, endpoint)
+    current_route = _get_current_route(app.router, endpoint)
+    if current_route is None:
+        raise CurrentRouteNotFound()  # pragma: no cover
+    return current_route
 
 
 __all__ = ["get_current_route"]
