@@ -2,7 +2,7 @@ import contextlib
 import functools
 import inspect
 import urllib.parse
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypedDict, Union
 
 import wtforms
@@ -12,6 +12,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import BaseRoute, Mount, Route, request_response
 from starlette.types import ASGIApp, Receive, Scope, Send
+from typing_extensions import TypeAlias
 
 from asgi_admin._constants import ROUTE_NAME_SEPARATOR, SCOPE_ROOT_VIEW
 
@@ -689,9 +690,15 @@ class ModelViewEditFieldsConfigurationError(ViewConfigurationError):
         super().__init__("Either `fields` or `form_class` must be provided.")
 
 
+AsyncValidator: TypeAlias = Callable[
+    [Request, RepositoryProtocol[Model], Model, wtforms.Form], Awaitable[bool]
+]
+
+
 class ModelViewEdit(ModelView[Model]):
     fields: Sequence[tuple[str, wtforms.Field]]
     form_class: type[wtforms.Form]
+    async_validators: Sequence[AsyncValidator]
 
     def __init__(
         self,
@@ -712,6 +719,7 @@ class ModelViewEdit(ModelView[Model]):
             ],
             None,
         ] = None,
+        async_validators: Union[Sequence[AsyncValidator], None] = None,
     ) -> None:
         super().__init__(
             path,
@@ -732,6 +740,8 @@ class ModelViewEdit(ModelView[Model]):
         else:
             raise ModelViewEditFieldsConfigurationError()
 
+        self.async_validators = async_validators or []
+
     async def model_endpoint(
         self, request: Request, repository: RepositoryProtocol[Model]
     ) -> Response:
@@ -743,7 +753,9 @@ class ModelViewEdit(ModelView[Model]):
 
         status_code = 200
         if request.method == "POST":
-            if form.validate() and await self.avalidate(request, repository, form):
+            if form.validate() and await self._async_validate(
+                request, repository, item, form
+            ):
                 item = await repository.update(item, form.data)
                 # TODO: Success message
             else:
@@ -756,17 +768,22 @@ class ModelViewEdit(ModelView[Model]):
             status_code=status_code,
         )
 
-    async def avalidate(
-        self,
-        request: Request,
-        repository: RepositoryProtocol[Model],
-        form: wtforms.Form,
-    ) -> bool:
-        return True
-
     async def get_title(self, request: Request) -> str:
         item: Model = request.state.item
         return request.state.repository.get_title(item)
+
+    async def _async_validate(
+        self,
+        request: Request,
+        repository: RepositoryProtocol[Model],
+        item: Model,
+        form: wtforms.Form,
+    ) -> bool:
+        valid = True
+        for async_validator in self.async_validators:
+            if not await async_validator(request, repository, item, form):
+                valid = False
+        return valid
 
 
 class AdminViewMiddleware:
