@@ -743,7 +743,7 @@ class ModelViewEdit(ModelView[Model]):
 
         status_code = 200
         if request.method == "POST":
-            if form.validate():
+            if form.validate() and await self.avalidate(request, repository, form):
                 item = await repository.update(item, form.data)
                 # TODO: Success message
             else:
@@ -755,6 +755,14 @@ class ModelViewEdit(ModelView[Model]):
             {"item": item, "form": form},
             status_code=status_code,
         )
+
+    async def avalidate(
+        self,
+        request: Request,
+        repository: RepositoryProtocol[Model],
+        form: wtforms.Form,
+    ) -> bool:
+        return True
 
     async def get_title(self, request: Request) -> str:
         item: Model = request.state.item
