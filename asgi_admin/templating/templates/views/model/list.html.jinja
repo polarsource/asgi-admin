@@ -83,20 +83,20 @@
                 </ul>
               </td>
             {% endif %}
-            {% for field in view.fields %}
+            {% for field_key, field in view.fields.items() %}
               <td class="group">
                 <div class="flex flex-row items-center gap-2">
                   {% if loop.first and details_view %}
                     <a
                       class="link link-hover link-primary"
                       href="{{ request.url_for(details_view.route_name, pk=item_pk) }}"
-                      >{{ item_values[item_loop.index0][field] }}</a
+                      >{{ item_values[item_loop.index0][field_key] }}</a
                     >
                   {% else %}
-                    {{ item_values[item_loop.index0][field] }}
+                    {{ item_values[item_loop.index0][field_key] }}
                   {% endif %}
                   {% if field.copyable %}
-                    {{ clipboard.copy(item_values[item_loop.index0][field], class="invisible group-hover:visible") }}
+                    {{ clipboard.copy(item_values[item_loop.index0][field_key], class="invisible group-hover:visible") }}
                   {% endif %}
                 </div>
               </td>
