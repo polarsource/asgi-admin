@@ -12,7 +12,7 @@
             <input
               class="grow"
               type="search"
-              placeholder="Query by {{ view.query_fields | map('keygetter', view.fields) | map('untitle') | join(', ') }}"
+              placeholder="Query"
               name="query"
               value="{{ query or '' }}"
             />
@@ -28,16 +28,16 @@
           {% if item_views %}
             <th class="w-px"></th>
           {% endif %}
-          {% for field in view.fields %}
+          {% for field_key, field in view.fields.items() %}
             <th>
-              {% if field in view.sortable_fields %}
+              {% if field.sorting %}
                 <a
                   class="link link-hover flex flex-row items-center gap-1"
-                  href="{{ sorting.get_sorting_route(field) }}"
+                  href="{{ sorting.get_sorting_route(field_key) }}"
                 >
-                  {{ view.fields[field] }}
-                  {% if sorting.fields[field] %}
-                    {% if sorting.fields[field] == "ASC" %}
+                  {{ field.label }}
+                  {% if sorting.fields[field_key] %}
+                    {% if sorting.fields[field_key] == "ASC" %}
                       {{ icons.arrow_long_down("h-4 w-4") }}
                     {% else %}
                       {{ icons.arrow_long_up("h-4 w-4") }}
@@ -47,7 +47,7 @@
                   {% endif %}
                 </a>
               {% else %}
-                {{ view.fields[field] }}
+                {{ field.label }}
               {% endif %}
             </th>
           {% endfor %}
@@ -56,6 +56,7 @@
       <tbody>
         {% for item in items %}
           {% set item_pk = repository.get_pk(item) %}
+          {% set item_loop = loop %}
           <tr class="hover">
             {% if item_views %}
               <td>
@@ -89,12 +90,14 @@
                     <a
                       class="link link-hover link-primary"
                       href="{{ request.url_for(details_view.route_name, pk=item_pk) }}"
-                      >{{ item[field] }}</a
+                      >{{ item_values[item_loop.index0][field] }}</a
                     >
                   {% else %}
-                    {{ item[field] }}
+                    {{ item_values[item_loop.index0][field] }}
                   {% endif %}
-                  {{ clipboard.copy(item[field], class="invisible group-hover:visible") }}
+                  {% if field.copyable %}
+                    {{ clipboard.copy(item_values[item_loop.index0][field], class="invisible group-hover:visible") }}
+                  {% endif %}
                 </div>
               </td>
             {% endfor %}

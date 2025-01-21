@@ -1,7 +1,9 @@
 import dataclasses
 import datetime
 import functools
+import random
 from collections.abc import AsyncIterator, Iterable, Sequence
+from enum import Enum
 from operator import attrgetter
 from typing import Any, Union
 
@@ -17,6 +19,7 @@ from asgi_admin.templating import Renderer
 from asgi_admin.views import (
     AdminViewGroup,
     AdminViewIndex,
+    ListField,
     ModelView,
     ModelViewEdit,
     ModelViewGroup,
@@ -25,11 +28,21 @@ from asgi_admin.views import (
 )
 
 
+class MyModelStatus(str, Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+
+    def get_display_name(self) -> str:
+        return self.name.capitalize()
+
+
 @dataclasses.dataclass
 class MyModel:
     id: str
     label: str
     created_at: datetime.datetime
+    status: MyModelStatus
 
 
 class MyModelRepository(RepositoryProtocol[MyModel]):
@@ -127,6 +140,15 @@ def create_admin(items: MyModelMapping) -> ViewBase:
                         fields=(
                             ("id", "ID"),
                             ("label", "Label"),
+                            (
+                                "status",
+                                ListField[MyModel](
+                                    lambda item: item.status.get_display_name(),
+                                    label="Status",
+                                    sorting="status",
+                                    copyable=False,
+                                ),
+                            ),
                             ("created_at", "Created At"),
                         ),
                         query_fields=("id", "label"),
@@ -175,6 +197,7 @@ admin = create_admin(
             id=f"item_{i}",
             label=f"Item {i}",
             created_at=datetime.datetime.now(),
+            status=random.choice(list(MyModelStatus)),
         )
         for i in range(10)
     }
