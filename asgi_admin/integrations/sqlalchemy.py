@@ -49,7 +49,12 @@ class RepositoryBase(RepositoryProtocol[Model]):
 
         for field, order in sorting:
             order_function = asc if order == SortingOrder.ASC else desc
-            statement = statement.order_by(order_function(getattr(self.model, field)))
+            if isinstance(field, str):
+                statement = statement.order_by(
+                    order_function(getattr(self.model, field))
+                )
+            else:
+                statement = statement.order_by(order_function(field))
 
         paginated_statement: Select[tuple[Model, int]] = (
             statement.add_columns(over(func.count())).limit(limit).offset(offset)

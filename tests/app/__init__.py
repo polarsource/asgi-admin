@@ -45,6 +45,14 @@ class MyModel:
     status: MyModelStatus
 
 
+def _status_sorting_function(item: MyModel) -> int:
+    return {
+        MyModelStatus.PENDING: 0,
+        MyModelStatus.ACTIVE: 1,
+        MyModelStatus.BLOCKED: 2,
+    }[item.status]
+
+
 class MyModelRepository(RepositoryProtocol[MyModel]):
     def __init__(self, items: dict[str, MyModel]) -> None:
         self._items = items
@@ -77,7 +85,10 @@ class MyModelRepository(RepositoryProtocol[MyModel]):
 
         # Sorting
         for field, way in reversed(sorting):
-            items.sort(key=attrgetter(field), reverse=way == SortingOrder.DESC)
+            if isinstance(field, str):
+                items.sort(key=attrgetter(field), reverse=way == SortingOrder.DESC)
+            elif callable(field):
+                items.sort(key=field, reverse=way == SortingOrder.DESC)  # type: ignore
 
         # Offset and limit
         return len(items), items[offset : offset + limit]
@@ -145,7 +156,7 @@ def create_admin(items: MyModelMapping) -> ViewBase:
                                 ListField[MyModel](
                                     lambda item: item.status.get_display_name(),
                                     label="Status",
-                                    sorting="status",
+                                    sorting=_status_sorting_function,
                                     copyable=False,
                                 ),
                             ),

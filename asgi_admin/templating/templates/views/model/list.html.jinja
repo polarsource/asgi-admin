@@ -30,7 +30,7 @@
           {% endif %}
           {% for field_key, field in view.fields.items() %}
             <th>
-              {% if field.sorting %}
+              {% if field.sortable %}
                 <a
                   class="link link-hover flex flex-row items-center gap-1"
                   href="{{ sorting.get_sorting_route(field_key) }}"

@@ -18,7 +18,7 @@ from asgi_admin._constants import ROUTE_NAME_SEPARATOR, SCOPE_ROOT_VIEW
 
 from ._breadcrumbs import BreadcrumbItem
 from .exceptions import ASGIAdminConfigurationError, ASGIAdminNotFound
-from .repository import Model, RepositoryProtocol, Sorting, SortingOrder
+from .repository import Model, RepositoryProtocol, SortingOrder
 from .templating import Renderer, default_renderer
 
 if TYPE_CHECKING:
@@ -501,7 +501,7 @@ def _is_model_getter(
 class ListField(Generic[Model]):
     value_getter: Callable[[Request, Model], Awaitable[str]]
     label: str
-    sorting: Union[str, None]
+    sorting: Union[str, Any, None]
     copyable: bool
 
     def __init__(
@@ -511,7 +511,7 @@ class ListField(Generic[Model]):
         ],
         label: str,
         *,
-        sorting: Union[str, None] = None,
+        sorting: Union[str, Any, None] = None,
         copyable: bool = True,
     ) -> None:
         if isinstance(value_getter, str):
@@ -542,9 +542,16 @@ class ListField(Generic[Model]):
         name, label = t
         return cls(lambda m: getattr(m, name), label, sorting=name)
 
+    @property
+    def sortable(self) -> bool:
+        return self.sorting is not None
+
+
+SortedFields: TypeAlias = dict[str, SortingOrder]
+
 
 class SortingOutput(TypedDict):
-    fields: dict[str, Union[SortingOrder, None]]
+    fields: SortedFields
     get_sorting_route: Callable[[str], str]
 
 
@@ -608,11 +615,18 @@ class ModelViewList(ModelView[Model]):
         self, request: Request, repository: RepositoryProtocol[Model]
     ) -> Response:
         offset, limit = self._get_pagination_input(request)
-        sorting = self._get_sorting_input(request)
+        sorted_fields = self._get_sorting_input(request)
         query = await self._get_query_input(request)
 
         total, items = await repository.list(
-            sorting, offset, limit, query=query, query_fields=self.query_fields
+            [
+                (self.fields[field].sorting, order)
+                for field, order in sorted_fields.items()
+            ],
+            offset,
+            limit,
+            query=query,
+            query_fields=self.query_fields,
         )
 
         item_values: list[dict[str, str]] = []
@@ -633,7 +647,7 @@ class ModelViewList(ModelView[Model]):
                 "pagination": self._get_pagination_output(
                     request, offset, limit, total
                 ),
-                "sorting": self._get_sorting_output(request, sorting),
+                "sorting": self._get_sorting_output(request, sorted_fields),
                 "query": query,
                 "details_view": self._get_details_view(),
                 "item_views": self._get_item_views(),
@@ -692,49 +706,30 @@ class ModelViewList(ModelView[Model]):
             "previous_route": previous_route,
         }
 
-    def _get_sortable_fields(self) -> list[str]:
-        return [key for key, field in self.fields.items() if field.sorting is not None]
-
-    def _get_sorting_input(self, request: Request) -> Sorting:
+    def _get_sorting_input(self, request: Request) -> SortedFields:
         sorting_param = request.query_params.get("sorting")
         if sorting_param is None:
-            return []
+            return {}
 
-        sorting = []
-        for field in sorting_param.split(","):
+        sorting: SortedFields = {}
+        for field_key in sorting_param.split(","):
             order = SortingOrder.ASC
-            if field.startswith("-"):
+            if field_key.startswith("-"):
                 order = SortingOrder.DESC
-                field = field[1:]
-            if field in self._get_sortable_fields():
-                sorting.append((field, order))
+                field_key = field_key[1:]
+            if (field := self.fields.get(field_key, None)) and field.sortable:
+                sorting[field_key] = order
         return sorting
 
-    def _get_sorting_output(self, request: Request, sorting: Sorting) -> SortingOutput:
-        fields: dict[str, Union[SortingOrder, None]] = {
-            field: None for field in self._get_sortable_fields()
-        }
-        for field, current_order in sorting:
-            fields[field] = current_order
-
+    def _get_sorting_output(
+        self, request: Request, sorted_fields: SortedFields
+    ) -> SortingOutput:
         def get_sorting_route(field_key: str) -> str:
             sorting_param: list[str] = []
-            field_found = False
-            for current_field, current_order in sorting:
-                if current_field != field_key:
-                    sorting_param.append(
-                        f"{current_field}"
-                        if current_order == SortingOrder.ASC
-                        else f"-{current_field}"
-                    )
-                else:
-                    field_found = True
-                    if current_order == SortingOrder.DESC:
-                        continue
-                    else:
-                        sorting_param.append(f"-{field_key}")
-
-            if self.fields[field_key].sorting and not field_found:
+            if field_key in sorted_fields:
+                if sorted_fields[field_key] == SortingOrder.ASC:
+                    sorting_param.append(f"-{field_key}")
+            elif self.fields[field_key].sortable:
                 sorting_param.append(field_key)
 
             query_params = urllib.parse.urlencode(
@@ -742,7 +737,7 @@ class ModelViewList(ModelView[Model]):
             )
             return f"{request.url_for(self.route_name)}?{query_params}"
 
-        return {"fields": fields, "get_sorting_route": get_sorting_route}
+        return {"fields": sorted_fields, "get_sorting_route": get_sorting_route}
 
     async def _get_query_input(self, request: Request) -> Union[str, None]:
         query = request.query_params.get("query")

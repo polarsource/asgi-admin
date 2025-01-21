@@ -12,7 +12,7 @@ class SortingOrder(str, Enum):
     DESC = "DESC"
 
 
-Sorting: TypeAlias = Sequence[tuple[str, SortingOrder]]
+Sorting: TypeAlias = Sequence[tuple[Union[str, Any], SortingOrder]]
 
 
 class RepositoryProtocol(Protocol[Model]):
